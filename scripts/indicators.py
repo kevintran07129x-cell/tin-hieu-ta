@@ -107,26 +107,46 @@ def criteria(df, idx_close):
 
 
 REGIME_NOTE = {
-    'Tăng trưởng': 'Giai đoạn backtest cho lợi thế rõ nhất với 4 tổ hợp (vượt rổ ~+1,8%/lệnh ngoài mẫu).',
-    'Tạo đáy': 'Backtest: không quy tắc nào giữ được lợi thế ngoài mẫu, mua đều rổ tốt hơn.',
-    'Đỉnh/điều chỉnh': 'Backtest: các tổ hợp mất lợi thế ngoài mẫu ở giai đoạn này.',
-    'Suy giảm': 'Backtest: các tổ hợp mất lợi thế ngoài mẫu ở giai đoạn này, nên thận trọng.',
+    'Tăng trưởng': 'VN-Index đang trong nhịp tăng (đã hồi ≥ 6% từ đáy gần nhất) và trên MA50. Giai đoạn thuận lợi cho các tổ hợp mua theo xu hướng.',
+    'Tạo đáy': 'VN-Index vừa hồi ≥ 6% từ đáy nhưng còn dưới MA50: nhịp tăng mới chớm, dễ bị rung lắc.',
+    'Đỉnh/điều chỉnh': 'VN-Index đã giảm ≥ 6% từ đỉnh gần nhất nhưng còn trên MA50: thị trường đang điều chỉnh, nên thận trọng với lệnh mới.',
+    'Suy giảm': 'VN-Index trong nhịp giảm (≥ 6% từ đỉnh) và dưới MA50: tín hiệu mua dễ thất bại, nên thận trọng.',
 }
+
+SWING = 0.06   # ngưỡng lật nhịp: giảm 6% từ đỉnh -> nhịp giảm, tăng 6% từ đáy -> nhịp tăng
+
+
+def swing_state(c, x=SWING):
+    """+1 nhịp tăng, -1 nhịp giảm. Chỉ dùng giá đóng cửa đến ngày t (không nhìn trước)."""
+    st, ext, out = 1, c.iloc[0], []
+    for v in c.values:
+        if st == 1:
+            ext = max(ext, v)
+            if v <= ext * (1 - x):
+                st, ext = -1, v
+        else:
+            ext = min(ext, v)
+            if v >= ext * (1 + x):
+                st, ext = 1, v
+        out.append(st)
+    return pd.Series(out, c.index)
 
 
 def regimes(ix):
-    """Giai đoạn VN-Index, chỉ dùng thông tin đến ngày t.
-    Tăng trưởng: Giá > MA200, MA50 > MA200, cách đỉnh 1 năm không quá 10%.
-    Tạo đáy: không phải tăng trưởng, đã giảm >=15% từ đỉnh 1 năm, nhưng giá đã lên trên MA50.
-    Suy giảm: không thuộc hai nhóm trên và giá < MA200.
-    Đỉnh/điều chỉnh: còn lại."""
+    """Giai đoạn VN-Index theo nhịp sóng 6% và MA50 (đổi 23/11/2026, thay cách cũ MA50/MA200 bị trễ ~3–5 tuần).
+    Tăng trưởng: nhịp tăng và giá > MA50.   Tạo đáy: nhịp tăng, giá <= MA50, MA50 còn dốc xuống.
+    Đỉnh/điều chỉnh: nhịp giảm nhưng giá >= MA50, hoặc nhịp tăng mà giá thủng MA50 đang đi lên.   Suy giảm: nhịp giảm và giá < MA50.
+    Kiểm tra VN-Index 2014–2026: trễ trung bình ~11 phiên sau đỉnh/đáy thật (cách cũ ~22), ~5 lần đổi nhịp/năm."""
     c = ix.c
     m50 = c.rolling(50).mean(); m200 = c.rolling(200).mean()
     dd = c / c.rolling(250, min_periods=60).max() - 1
-    g = pd.Series('Đỉnh/điều chỉnh', index=c.index, dtype=object)
-    up = (c > m200) & (m50 > m200) & (dd > -0.10)
-    bot = ~up & (dd <= -0.15) & (c > m50)
-    down = ~up & ~bot & (c < m200)
-    g[down] = 'Suy giảm'; g[bot] = 'Tạo đáy'; g[up] = 'Tăng trưởng'
-    g[m200.isna()] = None
+    sw = swing_state(c)
+    g = pd.Series(None, index=c.index, dtype=object)
+    g[(sw == 1) & (c > m50)] = 'Tăng trưởng'
+    falling = m50.diff(10) < 0                 # MA50 còn dốc xuống: vừa đi lên từ nhịp giảm
+    g[(sw == 1) & (c <= m50) & falling] = 'Tạo đáy'
+    g[(sw == 1) & (c <= m50) & ~falling] = 'Đỉnh/điều chỉnh'   # nhịp tăng nhưng đã thủng MA50
+    g[(sw == -1) & (c >= m50)] = 'Đỉnh/điều chỉnh'
+    g[(sw == -1) & (c < m50)] = 'Suy giảm'
+    g[m50.isna()] = None
     return g, dd, m50, m200
