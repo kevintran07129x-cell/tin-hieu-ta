@@ -88,7 +88,13 @@ def load_offline(sym, is_index):
 
 
 def get(sym, is_index=False):
-    return load_offline(sym, is_index) if os.environ.get('OFFLINE_DIR') else fetch(sym, is_index)
+    d = load_offline(sym, is_index) if os.environ.get('OFFLINE_DIR') else fetch(sym, is_index)
+    # chạy trong giờ giao dịch: bỏ nến hôm nay chưa chốt (ATC đóng 14:45, chờ đến 15:05)
+    now = dt.datetime.now(VN)
+    if d is not None and len(d) and now.hour * 60 + now.minute < 15 * 60 + 5 \
+            and d.index[-1] == pd.Timestamp(now.date()):
+        src = d.attrs.get('src'); d = d.iloc[:-1]; d.attrs['src'] = src
+    return d
 
 
 # ---------------- tính toán ----------------
