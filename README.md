@@ -28,4 +28,9 @@ Chạy tay: tab **Actions** → *Cập nhật tín hiệu TA* → **Run workflow
 - C: XH dài + DI/ADX + CCI>100
 - D: XH dài + Vol>TB20 + DI/ADX
 
+## Danh mục mua mẫu (mô phỏng giấy)
+Vốn 1 tỷ, tối đa 10 mã, mỗi mã 1/10 giá trị danh mục. Mã vừa bật tổ hợp thì mua giá mở cửa phiên sau; giá đóng cửa dưới Supertrend thì bán giá mở cửa phiên sau (sớm nhất phiên thứ 3 sau ngày mua). Phí mua 0,15%, bán 0,25%.
+- `docs/data/portfolio_state.json`: trạng thái danh mục theo dõi thật (xóa file này để bắt đầu lại từ phiên mới nhất).
+- `docs/data/portfolio.json`: số liệu cho trang, gồm cả mô phỏng quá khứ khoảng 2,5 năm với danh sách mã hiện tại.
+
 Công cụ tham khảo, không phải khuyến nghị đầu tư.

@@ -19,12 +19,13 @@ import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
 from indicators import CRIT, CRIT_LABEL, COMBOS, REGIME_NOTE, criteria, regimes  # noqa: E402
+import portfolio as pf  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'docs', 'data')
 HIST = os.path.join(OUT, 'history')
 LIQ_MIN = float(os.environ.get('LIQ_MIN', '1'))
-DAYS = 800                      # lịch sử tải về (đủ cho MA200 và làm nóng chỉ báo)
+DAYS = 1300                     # lịch sử tải về: MA200 + làm nóng chỉ báo + ~2,5 năm mô phỏng danh mục
 VN = dt.timezone(dt.timedelta(hours=7))
 UA = {'User-Agent': 'Mozilla/5.0 (tin-hieu-ta; daily build)', 'Accept': 'application/json'}
 
@@ -104,10 +105,10 @@ def r2(x, n=2):
 
 def scan_symbol(meta, df, ix_close, session):
     if df is None or len(df) < 210:
-        return None, 'thiếu lịch sử'
-    if df.index[-1] != session:
-        return None, f'chưa có phiên {session.date()} (phiên cuối {df.index[-1].date()})'
+        return None, 'thiếu lịch sử', None
     X = criteria(df, ix_close)
+    if df.index[-1] != session:
+        return None, f'chưa có phiên {session.date()} (phiên cuối {df.index[-1].date()})', X
     n = len(X); last = X.iloc[-1]; prev = X.iloc[-2]
     c = df.c.values
     st = X.Supertrend.values
@@ -135,7 +136,7 @@ def scan_symbol(meta, df, ix_close, session):
             # vừa bị bán phiên này: vị thế còn mở đến phiên trước, Supertrend lật xuống hôm nay
             info['exit'] = bool(e <= n - 2 and st[e:n - 1].all() and not st[-1])
         row['combos'][key] = info
-    return row, None
+    return row, None, X
 
 
 def main():
@@ -151,11 +152,13 @@ def main():
     with ThreadPoolExecutor(max_workers=int(os.environ.get('WORKERS', '6'))) as ex:
         frames = list(ex.map(lambda m: get(m['symbol']), metas))
 
-    rows, skipped, srcs = [], [], {}
+    rows, skipped, srcs, Xs, dfs = [], [], {}, {}, {}
     for m, df in zip(metas, frames):
         if df is not None:
             srcs[df.attrs.get('src')] = srcs.get(df.attrs.get('src'), 0) + 1
-        r, why = scan_symbol(m, df, ix.c, session)
+        r, why, X = scan_symbol(m, df, ix.c, session)
+        if X is not None:
+            Xs[m['symbol']] = X; dfs[m['symbol']] = df
         if r:
             rows.append(r)
         else:
@@ -205,6 +208,24 @@ def main():
     days = json.load(open(idx_p)) if os.path.exists(idx_p) else []
     days = sorted(set(days) | {market['session']}, reverse=True)
     json.dump(days, open(idx_p, 'w'))
+
+    # ---------- danh mục mua mẫu ----------
+    P = pf.build_panel(ix.index, Xs, dfs, LIQ_MIN)
+    bt_start = ix.index[min(260, len(ix) - 1)]
+    bt = pf.run(pf.new_state(str(bt_start.date())), P, after=bt_start)
+    st_p = os.path.join(OUT, 'portfolio_state.json')
+    live = json.load(open(st_p)) if os.path.exists(st_p) else pf.new_state(market['session'])
+    live = pf.run(live, P, after=live['last'])
+    with open(st_p, 'w', encoding='utf-8') as f:
+        json.dump(live, f, ensure_ascii=False, separators=(',', ':'))
+    port = dict(session=market['session'], maxpos=pf.MAXPOS, fee_buy=pf.FB, fee_sell=pf.FS,
+                live=pf.summary(live, P, ix.c), backtest=pf.summary(bt, P, ix.c))
+    port['backtest']['trades'] = port['backtest']['trades'][:200]
+    with open(os.path.join(OUT, 'portfolio.json'), 'w', encoding='utf-8') as f:
+        json.dump(port, f, ensure_ascii=False, separators=(',', ':'))
+    b = port['backtest']
+    print(f"Danh mục mẫu: đang giữ {len(live['pos'])}, chờ mua {len(live['pend_buy'])}; mô phỏng từ {b['start']}: "
+          f"{b.get('ret')}% vs VN-Index {b.get('vni_ret')}%, {b['n_trades']} lệnh", flush=True)
 
     print(f"Xong {len(rows)} mã ({len(liq_rows)} đủ thanh khoản), bỏ qua {len(skipped)}; "
           f"mua mới {len(buys)}, bán {len(sells)}; nguồn {srcs}; {time.time() - t_start:.0f}s")

@@ -58,6 +58,11 @@ svg{display:block;width:100%;height:auto}
 footer{font-size:12px;color:var(--mut);margin:20px 0}
 .hist-day{border-top:1px solid var(--line);padding:8px 0}
 .hist-day:first-child{border-top:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;padding:6px 12px}
+.seg button.on{background:var(--acc);color:#fff}
+h3{font-size:14px;margin:14px 0 6px}
+.sw{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:4px}
 a{color:var(--acc)}
 </style>
 </head>
@@ -100,6 +105,18 @@ a{color:var(--acc)}
     <h2>4 tổ hợp mua (backtest 2014–11/2026)</h2>
     <div id="combos"></div>
   </div>
+</div>
+
+<div class="card" id="pf">
+  <h2>Danh mục mua mẫu <span class="sub">(mô phỏng giấy, vốn 1 tỷ, tối đa 10 mã)</span></h2>
+  <div class="seg" id="pfseg"><button data-k="live" class="on">Theo dõi từ <span id="pfstart"></span></button><button data-k="backtest">Mô phỏng quá khứ</button></div>
+  <div class="kpis" id="pfkpis" style="margin-top:10px"></div>
+  <div id="pfchart"></div>
+  <div class="legend"><span><i class="sw" style="background:var(--acc)"></i> Danh mục</span><span><i class="sw" style="background:var(--mut)"></i> VN-Index</span></div>
+  <h3>Đang giữ</h3><div class="tw"><table id="pfpos"></table></div>
+  <h3>Lệnh chờ phiên tới</h3><div id="pfpend"></div>
+  <h3>Lịch sử lệnh đã đóng</h3><div class="tw" style="max-height:420px"><table id="pftr"></table></div>
+  <div class="sub" id="pfnote" style="margin-top:10px"></div>
 </div>
 
 <div class="card">
@@ -178,7 +195,7 @@ function render() {
     return `<div style="margin:4px 0"><span class="tag on">${k}</span> ${c.name} <span class="sub">· đang giữ ${on} mã</span></div>`;
   }).join('') + `<div class="sub" style="margin-top:8px">Tổ hợp bật khi cả 3 điều kiện cùng đạt (phiên trước chưa đạt) và GTGD TB20 ≥ ngưỡng. Giữ đến khi giá đóng cửa dưới Supertrend.</div>`;
   $('#critlegend').innerHTML = 'Ô màu theo thứ tự: ' + D.criteria.map((c, i) => `<span>${i + 1}. ${c.label}</span>`).join('');
-  filters(); table(); hist();
+  filters(); table(); hist(); loadPf();
 }
 
 function evTable(sel, list, empty) {
@@ -244,6 +261,56 @@ function table() {
   $('#tbl').innerHTML = head + '<tbody>' + (body || `<tr><td colspan="${COLS.length}" class="empty">Không có mã nào khớp bộ lọc.</td></tr>`) + '</tbody>';
   $('#tbl').querySelectorAll('th').forEach(th => th.onclick = () => {
     const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : (['s', 'sec', 'ex', 'since'].includes(k) ? 1 : -1); sortKey = k; table(); });
+}
+
+let PF, pfKey = 'live';
+const tyd = x => x == null ? '–' : fmt(x / 1e9, 3) + ' tỷ';
+const sd = d => d ? vnd(d).slice(0, 5) + '/' + d.slice(2, 4) : '';
+function loadPf() {
+  fetch('data/portfolio.json', {cache: 'no-store'}).then(r => r.json()).then(p => {
+    PF = p; $('#pfstart').textContent = vnd(p.live.start);
+    $('#pfseg').querySelectorAll('button').forEach(b => b.onclick = () => {
+      pfKey = b.dataset.k; $('#pfseg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); pf(); });
+    pf();
+  }).catch(() => { $('#pf').style.display = 'none'; });
+}
+function pf() {
+  const p = PF[pfKey], live = pfKey === 'live';
+  const k = [
+    ['Giá trị danh mục', tyd(p.nav ?? p.capital), p.ret == null ? 'chưa có phiên nào' : pct(p.ret) + ' từ ' + vnd(p.start)],
+    ['VN-Index cùng kỳ', p.vni_ret == null ? '–' : pct(p.vni_ret), p.ret == null ? '' : 'Chênh ' + pct(+(p.ret - p.vni_ret).toFixed(2))],
+    ['Sụt giảm lớn nhất', p.maxdd == null ? '–' : fmt(p.maxdd, 1) + '%', p.vni_maxdd == null ? '' : 'VN-Index ' + fmt(p.vni_maxdd, 1) + '%'],
+    ['Đang giữ', `${p.positions.length}/${PF.maxpos}`, 'Tiền mặt ' + tyd(p.cash)],
+    ['Lệnh đã đóng', p.n_trades, p.n_trades ? `Thắng ${fmt(p.win_rate, 0)}% · TB ${fmt(p.avg_ret, 1)}%/lệnh` : ''],
+  ];
+  if (!live && p.cagr != null) k.splice(2, 0, ['Lợi nhuận năm hóa', fmt(p.cagr, 1) + '%', 'VN-Index ' + fmt(p.vni_cagr, 1) + '%/năm']);
+  if (p.n_trades) k.push(['Lệnh thắng / thua TB', `${pct(p.avg_win)} / ${pct(p.avg_loss)}`, `Giữ TB ${fmt(p.avg_days, 0)} phiên · tỷ trọng CP TB ${fmt(p.exposure, 0)}%`]);
+  $('#pfkpis').innerHTML = k.map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
+  pfChart(p.series || []);
+  const pos = p.positions;
+  $('#pfpos').innerHTML = pos.length ? `<thead><tr><th>Mã</th><th>Tổ hợp</th><th>Ngày mua</th><th class="num">Giá mua</th><th class="num">Giá hiện tại</th><th class="num">LN (sau phí)</th><th class="num">KL</th><th class="num">Giá trị</th><th class="num">Số phiên</th><th></th></tr></thead><tbody>` +
+    pos.map(r => `<tr><td><b>${r.s}</b></td><td>${[...r.combos].map(c => `<span class="tag on">${c}</span>`).join('')}</td><td>${vnd(r.entry_d)}</td><td class="num">${fmt(r.entry_px)}</td><td class="num">${fmt(r.px)}</td><td class="num">${pct(r.ret)}</td><td class="num">${r.qty.toLocaleString('vi-VN')}</td><td class="num">${tyd(r.value)}</td><td class="num">${r.days}</td><td>${r.selling ? '<span class="pill g-dn">chờ bán</span>' : ''}</td></tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Chưa giữ mã nào.' + (live ? ' Danh mục chỉ mua khi có tổ hợp vừa bật, có thể phải chờ nhiều phiên khi thị trường yếu.' : '') + '</td></tr>';
+  const pend = [...p.pending_buy.map(o => `<span class="pill g-up">Mua ${o.s}</span> <span class="sub">${o.combos} · tín hiệu ${vnd(o.sig_d)} · ~${tyd(o.budget)}</span>`),
+    ...p.pending_sell.map(o => `<span class="pill g-dn">Bán ${o.s}</span> <span class="sub">${o.why}${o.sellable ? '' : ' · chưa đủ T+2, chờ thêm'}</span>`)];
+  $('#pfpend').innerHTML = pend.length ? pend.map(x => `<div style="margin:3px 0">${x}</div>`).join('') : '<div class="empty">Không có lệnh chờ. Lệnh được khớp ở giá mở cửa phiên sau.</div>';
+  const tr = p.trades;
+  $('#pftr').innerHTML = tr.length ? `<thead><tr><th>Mã</th><th>Tổ hợp</th><th>Mua</th><th class="num">Giá mua</th><th>Bán</th><th class="num">Giá bán</th><th class="num">Số phiên</th><th class="num">LN (sau phí)</th><th class="num">Lãi/lỗ</th></tr></thead><tbody>` +
+    tr.map(t => `<tr><td><b>${t.s}</b></td><td>${t.combos}</td><td>${vnd(t.buy_d)}</td><td class="num">${fmt(t.buy_px)}</td><td>${vnd(t.sell_d)}</td><td class="num">${fmt(t.sell_px)}</td><td class="num">${t.days}</td><td class="num">${pct(t.ret)}</td><td class="num">${pct(+(t.pnl / 1e6).toFixed(1)).replace('%', ' tr')}</td></tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Chưa có lệnh nào đóng.</td></tr>';
+  $('#pfnote').innerHTML = (live
+    ? 'Danh mục theo dõi thật từ ngày bắt đầu, mỗi phiên tự cập nhật, không sửa lại quá khứ. '
+    : `Mô phỏng lại từ ${vnd(p.start)} với danh sách mã hiện tại (thiên lệch sống sót: mã bị hủy niêm yết hoặc mới lên sàn không có), nên kết quả thường đẹp hơn thực tế. `) +
+    'Quy tắc: mã vừa bật ít nhất 1 tổ hợp A–D (giá trên Supertrend, GTGD TB20 ≥ 1 tỷ) thì mua giá mở cửa phiên sau, mỗi mã 1/10 giá trị danh mục, lô 100 cp; ưu tiên mã bật nhiều tổ hợp, thanh khoản cao. Bán giá mở cửa phiên sau khi giá đóng cửa dưới Supertrend, sớm nhất phiên thứ 3 sau ngày mua. Phí mua 0,15%, bán 0,25% (đã gồm thuế 0,1%), tiền mặt không lãi, chưa tính trượt giá. Không phải khuyến nghị đầu tư.';
+}
+function pfChart(sr) {
+  if (sr.length < 2) { $('#pfchart').innerHTML = '<div class="empty">Biểu đồ sẽ hiện khi danh mục có từ 2 phiên trở lên.</div>'; return; }
+  const W = 900, H = 220, P = 6, all = sr.flatMap(x => [x[1], x[2]]), lo = Math.min(...all), hi = Math.max(...all);
+  const X = i => P + i * (W - 2 * P) / (sr.length - 1), Y = v => H - 22 - (v - lo) / (hi - lo || 1) * (H - 40);
+  const line = (j, c, w) => `<path d="${sr.map((x, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(x[j]).toFixed(1)}`).join('')}" fill="none" stroke="${c}" stroke-width="${w}"/>`;
+  const ticks = [0, Math.floor(sr.length / 2), sr.length - 1].map(i => `<text x="${X(i)}" y="${H - 6}" font-size="11" fill="var(--mut)" text-anchor="${i ? i === sr.length - 1 ? 'end' : 'middle' : 'start'}">${vnd(sr[i][0])}</text>`).join('');
+  $('#pfchart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Danh mục so với VN-Index"><line x1="${P}" x2="${W - P}" y1="${Y(100)}" y2="${Y(100)}" stroke="var(--line)" stroke-dasharray="4 4"/>${line(2, 'var(--mut)', 1.3)}${line(1, 'var(--acc)', 2)}${ticks}
+    <text x="${W - P}" y="16" font-size="11" text-anchor="end" fill="var(--mut)">gốc = 100</text></svg>`;
 }
 
 async function hist() {
