@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tín hiệu TA hằng ngày</title>
+<style>
+:root{
+  --bg:#f6f7f9;--card:#fff;--ink:#1b1f24;--mut:#5d6672;--line:#e3e6ea;--acc:#2563eb;
+  --up:#0f8a4b;--upbg:#e3f4ea;--dn:#c62f2f;--dnbg:#fbe6e6;--warn:#a56300;--warnbg:#fdf1dc;
+  --dot0:#d9dde2;--bar:#5b8def;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1216;--card:#171b21;--ink:#e6e9ed;--mut:#9aa3ae;--line:#2a3039;--acc:#6ea0ff;
+  --up:#3ccf86;--upbg:#12301f;--dn:#ff6b6b;--dnbg:#3a1717;--warn:#f0b44c;--warnbg:#3a2a0e;
+  --dot0:#353c46;--bar:#6ea0ff;}}
+:root[data-theme="dark"]{
+  --bg:#0f1216;--card:#171b21;--ink:#e6e9ed;--mut:#9aa3ae;--line:#2a3039;--acc:#6ea0ff;
+  --up:#3ccf86;--upbg:#12301f;--dn:#ff6b6b;--dnbg:#3a1717;--warn:#f0b44c;--warnbg:#3a2a0e;
+  --dot0:#353c46;--bar:#6ea0ff;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0}
+h2{font-size:16px;margin:0 0 10px}
+.sub{color:var(--mut);font-size:13px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.kpi .l{color:var(--mut);font-size:12px}.kpi .v{font-size:22px;font-weight:650;margin-top:2px}
+.kpi .n{font-size:12px;color:var(--mut);margin-top:2px}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.g-up{background:var(--upbg);color:var(--up)}.g-dn{background:var(--dnbg);color:var(--dn)}.g-w{background:var(--warnbg);color:var(--warn)}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-size:12px;color:var(--mut);font-weight:600;position:sticky;top:0;background:var(--card);cursor:pointer;user-select:none}
+th.num,td.num{text-align:right}
+tbody tr:hover{background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.dots{display:inline-flex;gap:3px}.dots i{width:9px;height:9px;border-radius:2px;background:var(--dot0)}
+.dots i.on{background:var(--up)}
+.tag{display:inline-block;min-width:18px;text-align:center;padding:0 5px;margin-right:2px;border-radius:4px;font-size:11px;font-weight:700;background:var(--dot0);color:var(--mut)}
+.tag.on{background:var(--upbg);color:var(--up)}.tag.new{background:var(--up);color:#fff}.tag.x{background:var(--dnbg);color:var(--dn)}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+input,select,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:7px;padding:6px 9px}
+button{cursor:pointer}
+.dist{display:flex;align-items:flex-end;gap:6px;height:120px;padding-top:6px}
+.dist div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:11px;color:var(--mut)}
+.dist b{display:block;width:100%;background:var(--bar);border-radius:3px 3px 0 0;min-height:1px}
+.empty{color:var(--mut);padding:8px 0}
+.legend{font-size:12px;color:var(--mut)}
+.legend span{margin-right:12px;display:inline-block}
+svg{display:block;width:100%;height:auto}
+footer{font-size:12px;color:var(--mut);margin:20px 0}
+.hist-day{border-top:1px solid var(--line);padding:8px 0}
+.hist-day:first-child{border-top:0}
+a{color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Tín hiệu TA hằng ngày</h1>
+    <div class="sub" id="meta">Đang tải dữ liệu…</div>
+  </div>
+  <button id="theme" title="Đổi giao diện sáng/tối">◐ Giao diện</button>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="card">
+  <h2>VN-Index 1 năm và giai đoạn thị trường</h2>
+  <div id="chart"></div>
+  <div class="legend" id="reglegend"></div>
+  <div class="sub" id="regnote" style="margin-top:6px"></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Điểm mua mới phiên này <span class="sub">(mua mở cửa phiên kế tiếp)</span></h2>
+    <div class="tw"><table id="buys"></table></div>
+  </div>
+  <div class="card">
+    <h2>Điểm bán phiên này <span class="sub">(Supertrend lật xuống)</span></h2>
+    <div class="tw"><table id="sells"></table></div>
+  </div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Phân bố điểm (mã đủ thanh khoản)</h2>
+    <div class="dist" id="dist"></div>
+  </div>
+  <div class="card">
+    <h2>4 tổ hợp mua (backtest 2014–11/2026)</h2>
+    <div id="combos"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Bảng điểm toàn bộ mã</h2>
+  <div class="filters">
+    <input id="q" placeholder="Tìm mã…" size="10">
+    <select id="fex"><option value="">Mọi sàn</option></select>
+    <select id="fsec"><option value="">Mọi ngành</option></select>
+    <select id="fmin"><option value="0">Điểm từ 0</option></select>
+    <select id="fcombo">
+      <option value="">Mọi trạng thái</option>
+      <option value="open">Đang giữ theo tổ hợp</option>
+      <option value="new5">Kích hoạt ≤ 5 phiên</option>
+      <option value="on">Đang thỏa tổ hợp</option>
+    </select>
+    <label class="sub" style="align-self:center"><input type="checkbox" id="fliq" checked> GTGD TB20 ≥ ngưỡng</label>
+  </div>
+  <div class="tw" style="max-height:70vh"><table id="tbl"></table></div>
+  <div class="legend" id="critlegend" style="margin-top:8px"></div>
+</div>
+
+<div class="card">
+  <h2>Nhật ký tín hiệu các phiên gần đây</h2>
+  <div id="hist"></div>
+</div>
+
+<footer>
+  Dữ liệu giá ngày từ API công khai của DNSE (dự phòng VPS), tự cập nhật sau phiên ATC các ngày giao dịch.
+  Tín hiệu chấm theo trạng thái tại giá đóng cửa. Backtest: mua mở cửa phiên sau, phí 0,15%/0,25%, bán sớm nhất T+3,
+  thoát khi Supertrend lật xuống; tỷ lệ thắng chỉ khoảng 30–46%, lợi thế đến từ lệnh thắng lớn.
+  <b>Đây là công cụ tham khảo, không phải khuyến nghị đầu tư.</b>
+</footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmt = (x, d = 2) => x == null ? '–' : x.toLocaleString('vi-VN', {minimumFractionDigits: d, maximumFractionDigits: d});
+const pct = x => x == null ? '–' : `<span class="${x > 0 ? 'up' : x < 0 ? 'dn' : ''}">${x > 0 ? '+' : ''}${fmt(x, 1)}%</span>`;
+const vnd = d => d.split('-').reverse().join('/');
+const REGC = {'Tăng trưởng': 'g-up', 'Tạo đáy': 'g-w', 'Đỉnh/điều chỉnh': 'g-w', 'Suy giảm': 'g-dn'};
+const REGCOL = {'Tăng trưởng': 'var(--up)', 'Tạo đáy': 'var(--acc)', 'Đỉnh/điều chỉnh': 'var(--warn)', 'Suy giảm': 'var(--dn)'};
+let D, sortKey = 'score', sortDir = -1;
+
+try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$('#theme').onclick = () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const nx = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = nx;
+  try { localStorage.setItem('theme', nx); } catch (e) {}
+};
+
+fetch('data/latest.json', {cache: 'no-store'}).then(r => r.json()).then(d => { D = d; render(); })
+  .catch(e => $('#meta').textContent = 'Không tải được dữ liệu: ' + e);
+
+function render() {
+  const m = D.market;
+  $('#meta').innerHTML = `Phiên <b>${vnd(m.session)}</b> · cập nhật ${D.generated} (giờ VN) · chấm ${D.n_scored}/${D.n_universe} mã`;
+  const nOpen = D.rows.filter(r => r.ok_liq && Object.values(r.combos).some(c => c.open)).length;
+  $('#kpis').innerHTML = [
+    ['VN-Index', fmt(m.vnindex), pct(m.chg)],
+    ['Giai đoạn thị trường', `<span class="pill ${REGC[m.regime] || ''}">${m.regime}</span>`, `Cách đỉnh 1 năm ${fmt(m.dd, 1)}%`],
+    ['Mã đủ thanh khoản', D.n_liq, `GTGD TB20 ≥ ${fmt(D.liq_min, 0)} tỷ`],
+    ['Điểm mua mới', D.buys.length, 'mã bật tổ hợp phiên này'],
+    ['Điểm bán', D.sells.length, 'mã Supertrend lật xuống'],
+    ['Đang giữ theo tổ hợp', nOpen, 'Supertrend chưa lật'],
+  ].map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
+  $('#regnote').textContent = m.regime_note;
+  chart(m.history);
+  evTable('#buys', D.buys, 'Chưa có mã nào bật tổ hợp mua trong phiên này.');
+  evTable('#sells', D.sells, 'Không có mã nào phải bán theo tổ hợp trong phiên này.');
+  const mx = Math.max(...D.dist, 1);
+  $('#dist').innerHTML = D.dist.map((v, k) => `<div><span>${v}</span><b style="height:${v / mx * 85}%"></b>${k}</div>`).join('');
+  $('#combos').innerHTML = Object.entries(D.combos).map(([k, c]) => {
+    const on = D.rows.filter(r => r.ok_liq && r.combos[k] && r.combos[k].open).length;
+    return `<div style="margin:4px 0"><span class="tag on">${k}</span> ${c.name} <span class="sub">· đang giữ ${on} mã</span></div>`;
+  }).join('') + `<div class="sub" style="margin-top:8px">Tổ hợp bật khi cả 3 điều kiện cùng đạt (phiên trước chưa đạt) và GTGD TB20 ≥ ngưỡng. Giữ đến khi giá đóng cửa dưới Supertrend.</div>`;
+  $('#critlegend').innerHTML = 'Ô màu theo thứ tự: ' + D.criteria.map((c, i) => `<span>${i + 1}. ${c.label}</span>`).join('');
+  filters(); table(); hist();
+}
+
+function evTable(sel, list, empty) {
+  if (!list.length) { $(sel).outerHTML = `<div class="empty" id="${sel.slice(1)}">${empty}</div>`; return; }
+  $(sel).innerHTML = `<thead><tr><th>Mã</th><th>Ngành</th><th class="num">Giá</th><th class="num">+/-</th><th class="num">Điểm</th><th class="num">GTGD20</th><th>Tổ hợp</th></tr></thead><tbody>` +
+    list.map(r => `<tr><td><b>${r.s}</b></td><td>${r.sec || ''}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.chg)}</td><td class="num">${r.score}</td><td class="num">${fmt(r.liq, 1)}</td><td>${r.combos.map(k => `<span class="tag ${sel === '#buys' ? 'new' : 'x'}">${k}</span>`).join('')}</td></tr>`).join('') + '</tbody>';
+}
+
+function chart(h) {
+  const W = 900, H = 220, P = 6, vals = h.map(x => x.c), lo = Math.min(...vals), hi = Math.max(...vals);
+  const X = i => P + i * (W - 2 * P) / (h.length - 1), Y = v => H - 22 - (v - lo) / (hi - lo || 1) * (H - 40);
+  let bands = '', start = 0;
+  for (let i = 1; i <= h.length; i++) {
+    if (i === h.length || h[i].g !== h[start].g) {
+      if (h[start].g) bands += `<rect x="${X(start)}" y="4" width="${Math.max(X(i - 1) - X(start), 1)}" height="${H - 26}" fill="${REGCOL[h[start].g]}" opacity=".12"/>`;
+      start = i;
+    }
+  }
+  const path = h.map((x, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(x.c).toFixed(1)}`).join('');
+  const ticks = [0, Math.floor(h.length / 2), h.length - 1].map(i => `<text x="${X(i)}" y="${H - 6}" font-size="11" fill="var(--mut)" text-anchor="${i ? i === h.length - 1 ? 'end' : 'middle' : 'start'}">${vnd(h[i].d)}</text>`).join('');
+  $('#chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="VN-Index 1 năm">${bands}<path d="${path}" fill="none" stroke="var(--ink)" stroke-width="1.6"/>${ticks}
+    <text x="${W - P}" y="16" font-size="11" text-anchor="end" fill="var(--mut)">cao ${fmt(hi)} · thấp ${fmt(lo)}</text></svg>`;
+  $('#reglegend').innerHTML = Object.entries(REGCOL).map(([k, c]) => `<span><i style="display:inline-block;width:10px;height:10px;background:${c};opacity:.35;border-radius:2px"></i> ${k}</span>`).join('');
+}
+
+function filters() {
+  const uniq = k => [...new Set(D.rows.map(r => r[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+  uniq('ex').forEach(v => $('#fex').insertAdjacentHTML('beforeend', `<option>${v}</option>`));
+  uniq('sec').forEach(v => $('#fsec').insertAdjacentHTML('beforeend', `<option>${v}</option>`));
+  for (let k = 1; k <= 11; k++) $('#fmin').insertAdjacentHTML('beforeend', `<option value="${k}">Điểm từ ${k}</option>`);
+  ['#q', '#fex', '#fsec', '#fmin', '#fcombo', '#fliq'].forEach(s => $(s).addEventListener('input', table));
+}
+
+const COLS = [
+  ['s', 'Mã'], ['sec', 'Ngành'], ['ex', 'Sàn'], ['c', 'Giá', 1], ['chg', '+/-', 1], ['score', 'Điểm', 1], ['dscore', 'Δ', 1],
+  ['crit', '11 tiêu chí'], ['combos', 'Tổ hợp A B C D'], ['since', 'Kích hoạt'], ['ret', 'LN từ KH', 1],
+  ['rsi', 'RSI', 1], ['adx', 'ADX', 1], ['st', 'Supertrend', 1], ['liq', 'GTGD20 (tỷ)', 1]];
+
+function best(r) {   // tổ hợp đang mở gần nhất
+  const o = Object.values(r.combos).filter(c => c.open);
+  return o.length ? o.reduce((a, b) => a.age <= b.age ? a : b) : null;
+}
+
+function table() {
+  const q = $('#q').value.trim().toUpperCase(), ex = $('#fex').value, sec = $('#fsec').value, mn = +$('#fmin').value,
+    fc = $('#fcombo').value, liq = $('#fliq').checked;
+  let rows = D.rows.filter(r => (!q || r.s.includes(q)) && (!ex || r.ex === ex) && (!sec || r.sec === sec) && r.score >= mn && (!liq || r.ok_liq) &&
+    (!fc || (fc === 'open' && best(r)) || (fc === 'new5' && best(r) && best(r).age <= 5) || (fc === 'on' && Object.values(r.combos).some(c => c.on))));
+  const val = (r, k) => k === 'since' ? (best(r) ? best(r).age : 1e9) : k === 'ret' ? (best(r) ? best(r).ret : -1e9) :
+    k === 'combos' ? Object.values(r.combos).filter(c => c.open).length : k === 'crit' ? r.score : r[k];
+  rows.sort((a, b) => { const x = val(a, sortKey), y = val(b, sortKey);
+    return (typeof x === 'string' ? x.localeCompare(y, 'vi') : (x ?? -1e9) - (y ?? -1e9)) * sortDir || b.liq - a.liq; });
+  const head = '<thead><tr>' + COLS.map(([k, l, n]) => `<th class="${n ? 'num' : ''}" data-k="${k}">${l}${sortKey === k ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('') + '</tr></thead>';
+  const body = rows.map(r => {
+    const b = best(r);
+    const tags = Object.entries(r.combos).map(([k, c]) => `<span class="tag ${c.open && c.age === 0 ? 'new' : c.exit ? 'x' : c.open ? 'on' : ''}" title="${D.combos[k].name}${c.e ? ' · kích hoạt ' + vnd(c.e) : ''}">${k}</span>`).join('');
+    return `<tr><td><b>${r.s}</b></td><td>${r.sec || ''}</td><td>${r.ex || ''}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.chg)}</td>
+      <td class="num"><b>${r.score}</b></td><td class="num">${r.dscore > 0 ? '<span class="up">+' + r.dscore + '</span>' : r.dscore < 0 ? '<span class="dn">' + r.dscore + '</span>' : '0'}</td>
+      <td><span class="dots">${r.crit.map((v, i) => `<i class="${v ? 'on' : ''}" title="${D.criteria[i].label}"></i>`).join('')}</span></td>
+      <td>${tags}</td><td>${b ? vnd(b.e) + ` <span class="sub">(${b.age} phiên)</span>` : ''}</td><td class="num">${b ? pct(b.ret) : ''}</td>
+      <td class="num">${fmt(r.rsi, 0)}</td><td class="num">${fmt(r.adx, 0)}</td><td class="num">${fmt(r.st)}</td><td class="num">${fmt(r.liq, 1)}</td></tr>`;
+  }).join('');
+  $('#tbl').innerHTML = head + '<tbody>' + (body || `<tr><td colspan="${COLS.length}" class="empty">Không có mã nào khớp bộ lọc.</td></tr>`) + '</tbody>';
+  $('#tbl').querySelectorAll('th').forEach(th => th.onclick = () => {
+    const k = th.dataset.k; sortDir = sortKey === k ? -sortDir : (['s', 'sec', 'ex', 'since'].includes(k) ? 1 : -1); sortKey = k; table(); });
+}
+
+async function hist() {
+  try {
+    const days = (await fetch('data/history/index.json', {cache: 'no-store'}).then(r => r.json())).slice(0, 15);
+    const all = await Promise.all(days.map(d => fetch(`data/history/${d}.json`).then(r => r.json()).catch(() => null)));
+    const list = l => l.length ? l.map(x => `<b>${x.s}</b> <span class="sub">${x.combos.join('')}</span>`).join(', ') : '<span class="sub">không có</span>';
+    $('#hist').innerHTML = all.filter(Boolean).map(h => `<div class="hist-day"><b>${vnd(h.session)}</b> <span class="pill ${REGC[h.regime] || ''}">${h.regime}</span> <span class="sub">VN-Index ${fmt(h.vnindex)}</span>
+      <div>Mua: ${list(h.buys)}</div><div>Bán: ${list(h.sells)}</div></div>`).join('') || '<div class="empty">Chưa có nhật ký.</div>';
+  } catch (e) { $('#hist').innerHTML = '<div class="empty">Chưa có nhật ký.</div>'; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+name: Cập nhật tín hiệu TA
+
+on:
+  schedule:
+    # 15:40 và 17:30 giờ VN (UTC+7), thứ Hai đến thứ Sáu. Lần 2 là dự phòng nếu lần 1 lỗi hoặc nguồn chưa có giá phiên.
+    - cron: '40 8 * * 1-5'
+    - cron: '30 10 * * 1-5'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Tải giá và chấm điểm
+        run: python scripts/build.py
+      - name: Lưu dữ liệu vào repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data
+          git diff --cached --quiet || git commit -m "Dữ liệu phiên $(python -c "import json;print(json.load(open('docs/data/latest.json'))['market']['session'])")"
+          git push
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
