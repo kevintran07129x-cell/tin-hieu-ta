@@ -1,0 +1,28 @@
+name: Xuất dữ liệu giá để phân tích
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Tải giá (không ghi đè trang)
+        run: |
+          cp -r docs /tmp/docs_backup
+          DUMP_DIR=prices python scripts/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prices
+          path: prices
+          retention-days: 7

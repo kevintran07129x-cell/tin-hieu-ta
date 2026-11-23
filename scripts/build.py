@@ -152,6 +152,12 @@ def main():
     with ThreadPoolExecutor(max_workers=int(os.environ.get('WORKERS', '6'))) as ex:
         frames = list(ex.map(lambda m: get(m['symbol']), metas))
 
+    if os.environ.get('DUMP_DIR'):          # lưu giá thô để phân tích ngoài
+        os.makedirs(os.environ['DUMP_DIR'], exist_ok=True)
+        ix.to_csv(os.path.join(os.environ['DUMP_DIR'], 'VNINDEX.csv'), index_label='t')
+        for m, df in zip(metas, frames):
+            if df is not None:
+                df.to_csv(os.path.join(os.environ['DUMP_DIR'], f"{m['symbol']}.csv"), index_label='t')
     rows, skipped, srcs, Xs, dfs = [], [], {}, {}, {}
     for m, df in zip(metas, frames):
         if df is not None:
