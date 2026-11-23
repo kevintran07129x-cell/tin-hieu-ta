@@ -180,7 +180,7 @@ function render() {
     ['VN-Index', fmt(m.vnindex), pct(m.chg)],
     ['Giai đoạn thị trường', `<span class="pill ${REGC[m.regime] || ''}">${m.regime}</span>`, `Cách đỉnh 1 năm ${fmt(m.dd, 1)}%`],
     ['Mã đủ thanh khoản', D.n_liq, `GTGD TB20 ≥ ${fmt(D.liq_min, 0)} tỷ`],
-    ['Điểm mua mới', D.buys.length, 'mã bật tổ hợp phiên này'],
+    ['Điểm mua mới', D.buys.length, `mã bật tổ hợp, vốn hóa ≥ ${fmt(D.cap_min ?? 300, 0)} tỷ`],
     ['Điểm bán', D.sells.length, 'mã Supertrend lật xuống'],
     ['Đang giữ theo tổ hợp', nOpen, 'Supertrend chưa lật'],
   ].map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
@@ -301,7 +301,7 @@ function pf() {
   $('#pfnote').innerHTML = (live
     ? 'Danh mục theo dõi thật từ ngày bắt đầu, mỗi phiên tự cập nhật, không sửa lại quá khứ. '
     : `Mô phỏng lại từ ${vnd(p.start)} với danh sách mã hiện tại (thiên lệch sống sót: mã bị hủy niêm yết hoặc mới lên sàn không có), nên kết quả thường đẹp hơn thực tế. `) +
-    'Quy tắc: mã vừa bật ít nhất 1 tổ hợp A–D (giá trên Supertrend, GTGD TB20 ≥ 1 tỷ) thì mua giá mở cửa phiên sau, mỗi mã 1/10 giá trị danh mục, lô 100 cp; ưu tiên mã bật nhiều tổ hợp, thanh khoản cao. Bán giá mở cửa phiên sau khi giá đóng cửa dưới Supertrend, sớm nhất phiên thứ 3 sau ngày mua. Phí mua 0,15%, bán 0,25% (đã gồm thuế 0,1%), tiền mặt không lãi, chưa tính trượt giá. Không phải khuyến nghị đầu tư.';
+    'Quy tắc: mã vừa bật ít nhất 1 tổ hợp A–D (giá trên Supertrend, GTGD TB20 ≥ 1 tỷ, vốn hóa ≥ ' + fmt(D.cap_min ?? 300, 0) + ' tỷ) thì mua giá mở cửa phiên sau, mỗi mã 1/10 giá trị danh mục, lô 100 cp; ưu tiên mã bật nhiều tổ hợp, thanh khoản cao. Bán giá mở cửa phiên sau khi giá đóng cửa dưới Supertrend, sớm nhất phiên thứ 3 sau ngày mua. Phí mua 0,15%, bán 0,25% (đã gồm thuế 0,1%), tiền mặt không lãi, chưa tính trượt giá. Không phải khuyến nghị đầu tư.';
 }
 function pfChart(sr) {
   if (sr.length < 2) { $('#pfchart').innerHTML = '<div class="empty">Biểu đồ sẽ hiện khi danh mục có từ 2 phiên trở lên.</div>'; return; }

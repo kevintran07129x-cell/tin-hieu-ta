@@ -25,6 +25,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'docs', 'data')
 HIST = os.path.join(OUT, 'history')
 LIQ_MIN = float(os.environ.get('LIQ_MIN', '1'))
+CAP_MIN = float(os.environ.get('CAP_MIN', '300'))   # vốn hóa tối thiểu (tỷ đồng) để vào danh sách mua và danh mục mẫu
 DAYS = 1300                     # lịch sử tải về: MA200 + làm nóng chỉ báo + ~2,5 năm mô phỏng danh mục
 VN = dt.timezone(dt.timedelta(hours=7))
 UA = {'User-Agent': 'Mozilla/5.0 (tin-hieu-ta; daily build)', 'Accept': 'application/json'}
@@ -121,7 +122,7 @@ def scan_symbol(meta, df, ix_close, session):
         rsi=r2(last.rsi, 1), adx=r2(last.adx, 1), cci=r2(last.cci, 0), st=r2(last.st_line),
         macd_up=bool(last.macd_up), macd_dn=bool(last.macd_dn),
         st_flip_dn=bool(st[-2] and not st[-1]), st_flip_up=bool(st[-1] and not st[-2]),
-        ok_liq=liq >= LIQ_MIN, combos={},
+        ok_liq=liq >= LIQ_MIN, cap=r2(meta.get('market_cap'), 0), ok_cap=(meta.get('market_cap') or 0) >= CAP_MIN, combos={},
     )
     for key, cb in COMBOS.items():
         on = X[cb['crit']].all(axis=1).values
@@ -187,7 +188,7 @@ def main():
     def events(kind):
         out = []
         for r in liq_rows:
-            ks = [k for k, v in r['combos'].items() if (kind == 'buy' and v.get('age') == 0 and v.get('open'))
+            ks = [k for k, v in r['combos'].items() if (kind == 'buy' and r['ok_cap'] and v.get('age') == 0 and v.get('open'))
                   or (kind == 'sell' and v.get('exit'))]
             if ks:
                 out.append(dict(s=r['s'], sec=r['sec'], c=r['c'], chg=r['chg'], score=r['score'], liq=r['liq'], combos=ks))
@@ -196,7 +197,7 @@ def main():
     buys, sells = events('buy'), events('sell')
     now = dt.datetime.now(VN)
     latest = dict(
-        generated=now.strftime('%Y-%m-%d %H:%M'), liq_min=LIQ_MIN, n_universe=len(metas), n_scored=len(rows),
+        generated=now.strftime('%Y-%m-%d %H:%M'), liq_min=LIQ_MIN, cap_min=CAP_MIN, n_universe=len(metas), n_scored=len(rows),
         n_liq=len(liq_rows), skipped=skipped, sources=srcs, criteria=[dict(k=k, label=CRIT_LABEL[k]) for k in CRIT],
         combos={k: dict(name=v['name'], crit=v['crit']) for k, v in COMBOS.items()},
         market=market, dist=dist, buys=buys, sells=sells, rows=rows,
@@ -217,6 +218,8 @@ def main():
 
     # ---------- danh mục mua mẫu ----------
     P = pf.build_panel(ix.index, Xs, dfs, LIQ_MIN)
+    small = [m['symbol'] for m in metas if (m.get('market_cap') or 0) < CAP_MIN and m['symbol'] in P['sig'].columns]
+    P['sig'].loc[:, small] = 0          # không mua mã vốn hóa nhỏ
     bt_start = ix.index[min(260, len(ix) - 1)]
     bt = pf.run(pf.new_state(str(bt_start.date())), P, after=bt_start)
     st_p = os.path.join(OUT, 'portfolio_state.json')
