@@ -72,6 +72,7 @@ a{color:var(--acc)}
   <div>
     <h1>Tín hiệu TA hằng ngày</h1>
     <div class="sub" id="meta">Đang tải dữ liệu…</div>
+    <div id="intraday" class="g-w" style="display:none;margin-top:6px;padding:6px 10px;border-radius:8px;font-size:13px;font-weight:600"></div>
   </div>
   <button id="theme" title="Đổi giao diện sáng/tối">◐ Giao diện</button>
 </header>
@@ -187,7 +188,12 @@ fetch('data/latest.json', {cache: 'no-store'}).then(r => r.json()).then(d => { D
 
 function render() {
   const m = D.market;
-  $('#meta').innerHTML = `Phiên <b>${vnd(m.session)}</b> · cập nhật ${D.generated} (giờ VN) · chấm ${D.n_scored}/${D.n_universe} mã`;
+  $('#meta').innerHTML = `Phiên <b>${vnd(m.session)}</b>${m.intraday ? ' (giữa phiên)' : ''} · cập nhật ${D.generated} (giờ VN) · chấm ${D.n_scored}/${D.n_universe} mã`;
+  const iw = $('#intraday');
+  if (m.intraday) {
+    iw.style.display = 'block';
+    iw.textContent = `Giá giữa phiên lúc ${D.generated.slice(11)}, chưa chốt. Điểm và tín hiệu mua/bán bên dưới có thể đổi sau ATC. Danh mục mẫu và bộ G1/G2 vẫn theo giá đóng cửa phiên trước${D.short && D.short.session ? ' (' + vnd(D.short.session) + ')' : ''}. Bản chốt cập nhật sau 15:40.`;
+  } else iw.style.display = 'none';
   const nOpen = D.rows.filter(r => r.ok_liq && Object.values(r.combos).some(c => c.open)).length;
   $('#kpis').innerHTML = [
     ['VN-Index', fmt(m.vnindex), pct(m.chg)],

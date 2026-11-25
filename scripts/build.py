@@ -5,6 +5,9 @@ Biến môi trường:
   OFFLINE_DIR   thư mục CSV (t,o,h,l,c,v) để chạy thử không cần mạng
   OFFLINE_DIV   chia giá CSV cho số này để ra nghìn đồng (mặc định 1000; chỉ số không chia)
   LIQ_MIN       ngưỡng GTGD TB20 tỷ đồng (mặc định 1)
+  INTRADAY=1    chạy giữa phiên (sau 11:30): giữ nến hôm nay chưa chốt, chỉ ghi latest.json
+                (đánh dấu market.intraday); không ghi nhật ký phiên, không đổi danh mục mẫu;
+                G1/G2 vẫn tính theo giá đóng cửa phiên trước.
   WATCHLIST     0 = chấm cả universe.json; mặc định chỉ chấm mã trong scripts/watchlist.json
 """
 import datetime as dt
@@ -30,6 +33,7 @@ LIQ_MIN = float(os.environ.get('LIQ_MIN', '1'))
 CAP_MIN = float(os.environ.get('CAP_MIN', '300'))   # vốn hóa tối thiểu (tỷ đồng) để vào danh sách mua và danh mục mẫu
 DAYS = 1300                     # lịch sử tải về: MA200 + làm nóng chỉ báo + ~2,5 năm mô phỏng danh mục
 VN = dt.timezone(dt.timedelta(hours=7))
+INTRADAY = os.environ.get('INTRADAY') == '1'
 UA = {'User-Agent': 'Mozilla/5.0 (tin-hieu-ta; daily build)', 'Accept': 'application/json'}
 
 
@@ -95,7 +99,7 @@ def get(sym, is_index=False):
     d = load_offline(sym, is_index) if os.environ.get('OFFLINE_DIR') else fetch(sym, is_index)
     # chạy trong giờ giao dịch: bỏ nến hôm nay chưa chốt (ATC đóng 14:45, chờ đến 15:05)
     now = dt.datetime.now(VN)
-    if d is not None and len(d) and now.hour * 60 + now.minute < 15 * 60 + 5 \
+    if not INTRADAY and d is not None and len(d) and now.hour * 60 + now.minute < 15 * 60 + 5 \
             and d.index[-1] == pd.Timestamp(now.date()):
         src = d.attrs.get('src'); d = d.iloc[:-1]; d.attrs['src'] = src
     return d
@@ -208,8 +212,15 @@ def main():
 
     buys, sells = events('buy'), events('sell')
     # bộ tín hiệu ngắn hạn G1/G2 (giữ tối đa 30 phiên, cắt lỗ 7%)
-    short = nh.scan(metas, {m['symbol']: df for m, df in zip(metas, frames)}, session, LIQ_MIN)
+    if INTRADAY:      # G1/G2 chỉ theo giá đóng cửa: bỏ nến hôm nay chưa chốt
+        prev = ix.index[-2]
+        closed = {m['symbol']: (df[df.index <= prev] if df is not None else None) for m, df in zip(metas, frames)}
+        short = nh.scan(metas, closed, prev, LIQ_MIN)
+        short['session'] = str(prev.date())
+    else:
+        short = nh.scan(metas, {m['symbol']: df for m, df in zip(metas, frames)}, session, LIQ_MIN)
     now = dt.datetime.now(VN)
+    market['intraday'] = INTRADAY
     latest = dict(
         generated=now.strftime('%Y-%m-%d %H:%M'), liq_min=LIQ_MIN, cap_min=CAP_MIN, n_universe=len(metas), n_scored=len(rows),
         n_liq=len(liq_rows), skipped=skipped, sources=srcs, criteria=[dict(k=k, label=CRIT_LABEL[k]) for k in CRIT],
@@ -219,6 +230,10 @@ def main():
     os.makedirs(HIST, exist_ok=True)
     with open(os.path.join(OUT, 'latest.json'), 'w', encoding='utf-8') as f:
         json.dump(latest, f, ensure_ascii=False, separators=(',', ':'))
+    if INTRADAY:
+        print(f"Giữa phiên {session.date()} lúc {latest['generated']}: chấm {len(rows)} mã, mua {len(buys)}, bán {len(sells)}; "
+              f"không ghi nhật ký phiên, không đổi danh mục mẫu; {time.time() - t_start:.0f}s")
+        return
 
     # nhật ký tín hiệu theo phiên (nhỏ gọn) và chỉ mục
     day = dict(session=market['session'], regime=regime, vnindex=market['vnindex'], buys=buys, sells=sells,
