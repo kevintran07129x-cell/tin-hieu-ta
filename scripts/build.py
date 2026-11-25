@@ -5,6 +5,7 @@ Biến môi trường:
   OFFLINE_DIR   thư mục CSV (t,o,h,l,c,v) để chạy thử không cần mạng
   OFFLINE_DIV   chia giá CSV cho số này để ra nghìn đồng (mặc định 1000; chỉ số không chia)
   LIQ_MIN       ngưỡng GTGD TB20 tỷ đồng (mặc định 1)
+  WATCHLIST     0 = chấm cả universe.json; mặc định chỉ chấm mã trong scripts/watchlist.json
 """
 import datetime as dt
 import json
@@ -144,6 +145,16 @@ def main():
     t_start = time.time()
     uni = json.load(open(os.path.join(os.path.dirname(__file__), 'universe.json')))
     metas = [dict(zip(uni['columns'], r)) for r in uni['rows']]
+    # Chỉ chấm các mã trong danh sách theo dõi (scripts/watchlist.json, chép từ Google Sheet của anh Kevin).
+    # Ngành hiển thị theo nhóm trong sheet. Đặt WATCHLIST=0 để chấm cả universe.json.
+    wl_p = os.path.join(os.path.dirname(__file__), 'watchlist.json')
+    if os.environ.get('WATCHLIST', '1') != '0' and os.path.exists(wl_p):
+        grp = {}
+        for sec, syms in json.load(open(wl_p, encoding='utf-8'))['sectors'].items():
+            for s in syms:
+                grp.setdefault(s, sec)
+        by_sym = {m['symbol']: m for m in metas}
+        metas = [dict(by_sym.get(s, {'symbol': s}), sector=sec) for s, sec in grp.items()]
     ix = get('VNINDEX', True)
     if ix is None or len(ix) < 260:
         sys.exit('Không tải được VN-Index, dừng.')

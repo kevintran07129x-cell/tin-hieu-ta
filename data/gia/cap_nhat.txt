@@ -1,6 +1,6 @@
 phien_cuoi=2026-11-23
-cap_nhat_luc=2026-11-25 11:06 (gio VN)
-so_ma=274
+cap_nhat_luc=2026-11-25 11:14 (gio VN)
+so_ma=327
 nguon=DNSE entrade (du phong VPS histdatafeed); gia co phieu nghin dong, da dieu chinh; chi so tinh diem
-cham_phien=khong
+cham_phien=ART,DBT,HBS,ITA,PGS
 loi=khong

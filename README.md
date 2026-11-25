@@ -1,10 +1,11 @@
 # Tín hiệu TA hằng ngày
 
-Trang tĩnh chấm 11 tiêu chí phân tích kỹ thuật cho khoảng 270 mã cổ phiếu Việt Nam và quét 4 tổ hợp mua tốt nhất từ backtest 2014–11/2026. GitHub Actions tự chạy sau phiên ATC (15:40 và 17:30 giờ VN, thứ Hai đến thứ Sáu), không cần máy tính bật.
+Trang tĩnh chấm 11 tiêu chí phân tích kỹ thuật cho danh sách mã anh theo dõi (199 mã, `scripts/watchlist.json`) và quét 4 tổ hợp mua tốt nhất từ backtest 2014–11/2026. GitHub Actions tự chạy sau phiên ATC (15:40 và 17:30 giờ VN, thứ Hai đến thứ Sáu), không cần máy tính bật.
 
 - `scripts/build.py`: tải giá ngày (API công khai DNSE, dự phòng VPS), chấm điểm, ghi `docs/data/latest.json` và nhật ký `docs/data/history/`.
 - `scripts/indicators.py`: cách tính 11 tiêu chí, 4 tổ hợp, giai đoạn VN-Index.
-- `scripts/universe.json`: danh sách mã (sửa file này để thêm hoặc bớt mã).
+- `scripts/watchlist.json`: danh sách mã theo dõi theo nhóm ngành, chép từ Google Sheet "List cổ phiếu". Web chỉ chấm các mã này; sửa file này để thêm hoặc bớt mã (mã mới cần có dòng trong `universe.json`).
+- `scripts/universe.json`: danh mục thông tin mã (tên, sàn, vốn hóa) và rổ của kho giá `data/gia`.
 - `docs/index.html`: trang web.
 
 Chạy tay: tab **Actions** → *Cập nhật tín hiệu TA* → **Run workflow**.
