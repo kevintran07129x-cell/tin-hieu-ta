@@ -96,6 +96,19 @@ a{color:var(--acc)}
   </div>
 </div>
 
+<div class="card" id="sh">
+  <h2>Bộ tín hiệu ngắn hạn G1, G2 <span class="sub">(giữ tối đa 30 phiên, cắt lỗ 7%)</span></h2>
+  <div id="shrule" class="sub"></div>
+  <div class="tw" style="margin-top:8px"><table id="shbt"></table></div>
+  <div class="grid2" style="margin-top:6px">
+    <div><h3>Mua mới <span class="sub">(mua giá mở cửa phiên kế tiếp)</span></h3><div class="tw"><table id="shbuy"></table></div></div>
+    <div><h3>Bán phiên kế tiếp <span class="sub">(giá mở cửa)</span></h3><div class="tw"><table id="shsell"></table></div></div>
+  </div>
+  <h3>Đang giữ</h3><div class="tw" style="max-height:420px"><table id="shpos"></table></div>
+  <h3>Lệnh đã đóng 60 phiên gần nhất</h3><div class="tw" style="max-height:360px"><table id="shcl"></table></div>
+  <div class="sub" id="shnote" style="margin-top:10px"></div>
+</div>
+
 <div class="grid2">
   <div class="card">
     <h2>Phân bố điểm (mã đủ thanh khoản)</h2>
@@ -183,6 +196,7 @@ function render() {
     ['Điểm mua mới', D.buys.length, `mã bật tổ hợp, vốn hóa ≥ ${fmt(D.cap_min ?? 300, 0)} tỷ`],
     ['Điểm bán', D.sells.length, 'mã Supertrend lật xuống'],
     ['Đang giữ theo tổ hợp', nOpen, 'Supertrend chưa lật'],
+    ...(D.short ? [['Ngắn hạn G1/G2', `${D.short.buys.length} mua · ${D.short.sells.length} bán`, `đang giữ ${D.short.holding.length} vị thế`]] : []),
   ].map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
   $('#regnote').textContent = m.regime_note;
   chart(m.history);
@@ -195,7 +209,34 @@ function render() {
     return `<div style="margin:4px 0"><span class="tag on">${k}</span> ${c.name} <span class="sub">· đang giữ ${on} mã</span></div>`;
   }).join('') + `<div class="sub" style="margin-top:8px">Tổ hợp bật khi cả 3 điều kiện cùng đạt (phiên trước chưa đạt) và GTGD TB20 ≥ ngưỡng. Giữ đến khi giá đóng cửa dưới Supertrend.</div>`;
   $('#critlegend').innerHTML = 'Ô màu theo thứ tự: ' + D.criteria.map((c, i) => `<span>${i + 1}. ${c.label}</span>`).join('');
+  shortCard();
   filters(); table(); hist(); loadPf();
+}
+
+function shortCard() {
+  const S = D.short;
+  if (!S) { $('#sh').style.display = 'none'; return; }
+  const gt = g => `<span class="tag ${g === 'G2' ? 'new' : 'on'}">${g}</span>`;
+  const why = w => `<span class="pill ${w === 'Cắt lỗ 7%' ? 'g-dn' : 'g-w'}">${w}</span>`;
+  const low = r => r.ok_liq ? '' : ' <span class="pill g-w" title="GTGD TB20 dưới ngưỡng">thanh khoản thấp</span>';
+  $('#shrule').innerHTML = Object.entries(S.strats).map(([k, v]) => `<div style="margin:3px 0">${gt(k)} <b>${v.name}</b>: ${v.cond.map(c => S.cond_label[c]).join('; ')}.</div>`).join('') +
+    `<div style="margin-top:4px">Tín hiệu khi tất cả điều kiện của bộ đã xảy ra trong ${S.rule.win} phiên gần nhất (ít nhất một điều kiện xảy ra đúng phiên này). Mua giá mở cửa phiên sau. Bán giá mở cửa phiên thứ ${S.rule.hold} kể từ ngày mua, hoặc phiên sau khi giá đóng cửa thấp hơn giá mua ${fmt(S.rule.stop, 0)}% (sớm nhất phiên thứ 3). Không có tín hiệu bán nào khác.</div>`;
+  const bt = Object.entries(S.strats).map(([k, v]) => { const b = v.bt, r = S.stats[k] || {};
+    return `<tr><td>${gt(k)}</td><td class="num">${b.n.toLocaleString('vi-VN')}</td><td class="num">${fmt(b.win, 0)}%</td><td class="num">${pct(b.avg_win)} / ${pct(b.avg_loss)}</td><td class="num">${pct(b.exp)}</td><td class="num">${pct(b.exp_is)} <span class="sub">(nền ${fmt(b.base_is, 1)}%)</span></td><td class="num">${pct(b.exp_oos)} <span class="sub">(nền ${fmt(b.base_oos, 1)}%)</span></td><td class="num">${r.n ?? '–'} · ${r.win == null ? '–' : fmt(r.win, 0) + '%'} · ${pct(r.exp)}</td></tr>`; }).join('');
+  $('#shbt').innerHTML = `<thead><tr><th>Bộ</th><th class="num">Số lệnh 2014–2026</th><th class="num">% lệnh lãi</th><th class="num">Lãi TB / Lỗ TB</th><th class="num">Kỳ vọng/lệnh</th><th class="num">2014–2021</th><th class="num">2022–2026</th><th class="num">Dữ liệu web từ ${S.stats.G1 ? vnd(S.stats.G1.start) : '–'}: lệnh · lãi · kỳ vọng</th></tr></thead><tbody>${bt}</tbody>`;
+  $('#shbuy').innerHTML = S.buys.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Ngành</th><th class="num">Giá</th><th class="num">+/-</th><th class="num">GTGD20</th></tr></thead><tbody>` +
+    S.buys.map(r => `<tr><td><b>${r.s}</b>${low(r)}</td><td>${gt(r.g)}</td><td>${r.sec || ''}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.chg)}</td><td class="num">${fmt(r.liq, 1)}</td></tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Không có tín hiệu mua mới trong phiên này.</td></tr>';
+  $('#shsell').innerHTML = S.sells.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Lý do</th><th>Ngày mua</th><th class="num">Giá mua</th><th class="num">Giá hiện tại</th><th class="num">LN (sau phí)</th></tr></thead><tbody>` +
+    S.sells.map(r => `<tr><td><b>${r.s}</b></td><td>${gt(r.g)}</td><td>${why(r.why)}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.ret)}</td></tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Không có mã nào đến hạn bán.</td></tr>';
+  $('#shpos').innerHTML = S.holding.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Ngành</th><th>Ngày mua</th><th class="num">Giá mua</th><th class="num">Giá hiện tại</th><th class="num">LN (sau phí)</th><th class="num">Số phiên đã giữ</th><th class="num">Còn lại</th><th class="num">Giá cắt lỗ</th><th></th></tr></thead><tbody>` +
+    S.holding.map(r => `<tr><td><b>${r.s}</b>${low(r)}</td><td>${gt(r.g)}</td><td>${r.sec || ''}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.ret)}</td><td class="num">${r.days}</td><td class="num">${r.left}</td><td class="num">${fmt(r.stop_px)}</td><td>${S.sells.some(x => x.s === r.s && x.g === r.g) ? '<span class="pill g-dn">bán phiên tới</span>' : ''}</td></tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Chưa giữ mã nào.</td></tr>';
+  $('#shcl').innerHTML = S.closed.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Mua</th><th class="num">Giá mua</th><th>Bán</th><th class="num">Giá bán</th><th class="num">Số phiên</th><th>Lý do</th><th class="num">LN (sau phí)</th></tr></thead><tbody>` +
+    S.closed.map(r => `<tr><td><b>${r.s}</b></td><td>${gt(r.g)}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td>${vnd(r.sell_d)}</td><td class="num">${fmt(r.sell_px)}</td><td class="num">${r.days}</td><td>${why(r.why)}</td><td class="num">${pct(r.ret)}</td></tr>`).join('') + '</tbody>'
+    : '<tr><td class="empty">Chưa có lệnh nào đóng trong 60 phiên gần nhất.</td></tr>';
+  $('#shnote').innerHTML = 'Giá nghìn đồng. Vị thế tính lại mỗi phiên từ lịch sử giá theo đúng quy tắc, mỗi mã một lệnh mỗi bộ, không giới hạn số mã. Backtest 199 mã, phí mua 0,15%, bán 0,25%; nền = mua mọi phiên cùng cách giữ. Lệnh có lãi chỉ khoảng 45%, lãi đến từ ít lệnh thắng lớn; cắt lỗ 7% vẫn có lệnh lỗ 20–27% khi giảm sàn liên tiếp. Không phải khuyến nghị đầu tư.';
 }
 
 function evTable(sel, list, empty) {
@@ -319,7 +360,7 @@ async function hist() {
     const all = await Promise.all(days.map(d => fetch(`data/history/${d}.json`).then(r => r.json()).catch(() => null)));
     const list = l => l.length ? l.map(x => `<b>${x.s}</b> <span class="sub">${x.combos.join('')}</span>`).join(', ') : '<span class="sub">không có</span>';
     $('#hist').innerHTML = all.filter(Boolean).map(h => `<div class="hist-day"><b>${vnd(h.session)}</b> <span class="pill ${REGC[h.regime] || ''}">${h.regime}</span> <span class="sub">VN-Index ${fmt(h.vnindex)}</span>
-      <div>Mua: ${list(h.buys)}</div><div>Bán: ${list(h.sells)}</div></div>`).join('') || '<div class="empty">Chưa có nhật ký.</div>';
+      <div>Mua: ${list(h.buys)}</div><div>Bán: ${list(h.sells)}</div>${h.short_buys ? `<div>Ngắn hạn mua: ${h.short_buys.length ? h.short_buys.map(x => `<b>${x.s}</b> <span class="sub">${x.g}</span>`).join(', ') : '<span class="sub">không có</span>'} · bán: ${h.short_sells.length ? h.short_sells.map(x => `<b>${x.s}</b> <span class="sub">${x.g} ${x.why}</span>`).join(', ') : '<span class="sub">không có</span>'}</div>` : ''}</div>`).join('') || '<div class="empty">Chưa có nhật ký.</div>';
   } catch (e) { $('#hist').innerHTML = '<div class="empty">Chưa có nhật ký.</div>'; }
 }
 </script>
