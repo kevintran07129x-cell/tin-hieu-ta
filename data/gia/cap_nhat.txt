@@ -1,6 +1,6 @@
 phien_cuoi=2026-11-25
-cap_nhat_luc=2026-11-25 17:20 (gio VN)
+cap_nhat_luc=2026-11-25 19:05 (gio VN)
 so_ma=315
 nguon=DNSE entrade (du phong VPS histdatafeed); gia co phieu nghin dong, da dieu chinh; chi so tinh diem
 cham_phien=ART,HAC,HBS,ITA,PGS
-loi=HNXINDEX,UPCOMINDEX
+loi=khong
