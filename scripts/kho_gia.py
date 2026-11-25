@@ -37,6 +37,9 @@ def _frame(j, src):
     d['date'] = pd.to_datetime(d.date, unit='s', utc=True).dt.tz_convert('Asia/Ho_Chi_Minh').dt.strftime('%Y-%m-%d')
     d = d.drop_duplicates('date', keep='last').set_index('date').sort_index().astype(float)
     d = d[(d.close > 0) & (d.open > 0)]
+    now = dt.datetime.now(dt.timezone(dt.timedelta(hours=7)))
+    if now.hour * 60 + now.minute < 15 * 60 + 5:      # không lưu nến hôm nay chưa chốt
+        d = d[d.index < now.strftime('%Y-%m-%d')]
     d.attrs['src'] = src
     return d
 
