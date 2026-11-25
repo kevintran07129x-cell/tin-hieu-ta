@@ -1,7 +1,7 @@
 {
  "source": "https://docs.google.com/spreadsheets/d/15CcesXSEqsFc51L0cnwTcp_YOXWwtI_b_YhjxB7_i8w (tab Trang tính1)",
- "updated": "2026-11-25 (quét lại sheet 11:28)",
- "note": "Danh sách mã anh Kevin theo dõi, đúng các mã trong sheet; web chỉ chấm và báo tín hiệu các mã này. Mã nằm ở nhiều nhóm lấy nhóm đầu tiên làm ngành. Bỏ BDB và HAI vì đã hủy niêm yết, không có dữ liệu giá.",
+ "updated": "2026-11-25 (sheet 11:28, chỉ khối trên dòng 3–34)",
+ "note": "Danh sách mã anh Kevin theo dõi: chỉ khối trên của sheet (dòng 3–34, 200 mã), không tính khối dưới sau dòng trống (anh chọn 25/11/2026). Bỏ HAI vì đã hủy niêm yết, không có giá. Mã ở nhiều nhóm lấy nhóm đầu tiên làm ngành.",
  "sectors": {
   "BĐS": [
    "VHM",
@@ -22,18 +22,7 @@
    "NTL",
    "QCG",
    "ITC",
-   "DPG",
-   "DL1",
-   "L18",
-   "L14",
-   "NHA",
-   "DXS",
-   "CCL",
-   "EVG",
-   "HHS",
-   "TCH",
-   "VPL",
-   "KDH"
+   "DPG"
   ],
   "Bán lẻ": [
    "FRT",
@@ -232,10 +221,7 @@
    "SGB",
    "PGB",
    "VBB",
-   "VIB",
-   "NAB",
-   "SSB",
-   "BVB"
+   "VIB"
   ],
   "Thép": [
    "HSG",
