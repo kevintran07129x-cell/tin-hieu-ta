@@ -217,8 +217,11 @@ def main():
         closed = {m['symbol']: (df[df.index <= prev] if df is not None else None) for m, df in zip(metas, frames)}
         short = nh.scan(metas, closed, prev, LIQ_MIN)
         short['session'] = str(prev.date())
+        short['pf'] = nh.portfolio(closed, ix.c[ix.index <= prev], prev, LIQ_MIN)
     else:
-        short = nh.scan(metas, {m['symbol']: df for m, df in zip(metas, frames)}, session, LIQ_MIN)
+        allf = {m['symbol']: df for m, df in zip(metas, frames)}
+        short = nh.scan(metas, allf, session, LIQ_MIN)
+        short['pf'] = nh.portfolio(allf, ix.c, session, LIQ_MIN)
     now = dt.datetime.now(VN)
     market['intraday'] = INTRADAY
     latest = dict(
@@ -238,8 +241,8 @@ def main():
     # nhật ký tín hiệu theo phiên (nhỏ gọn) và chỉ mục
     day = dict(session=market['session'], regime=regime, vnindex=market['vnindex'], buys=buys, sells=sells,
                dist=dist, n_liq=len(liq_rows),
-               short_buys=[dict(s=x['s'], g=x['g']) for x in short['buys']],
-               short_sells=[dict(s=x['s'], g=x['g'], why=x['why'], ret=x['ret']) for x in short['sells']])
+               short_buys=[dict(s=x['s'], g=x['g']) for x in short['pf']['pend_buy']],
+               short_sells=[dict(s=x['s'], g=x['g'], why=x['why'], ret=x['ret']) for x in short['pf']['pend_sell']])
     with open(os.path.join(HIST, f"{market['session']}.json"), 'w', encoding='utf-8') as f:
         json.dump(day, f, ensure_ascii=False, separators=(',', ':'))
     idx_p = os.path.join(HIST, 'index.json')
@@ -267,7 +270,9 @@ def main():
     print(f"Danh mục mẫu: đang giữ {len(live['pos'])}, chờ mua {len(live['pend_buy'])}; mô phỏng từ {b['start']}: "
           f"{b.get('ret')}% vs VN-Index {b.get('vni_ret')}%, {b['n_trades']} lệnh", flush=True)
 
-    print(f"Ngắn hạn G1/G2: mua mới {len(short['buys'])}, đang giữ {len(short['holding'])}, bán phiên tới {len(short['sells'])}", flush=True)
+    print(f"Ngắn hạn G1/G2: tín hiệu mua {len(short['buys'])}; danh mục {short['pf']['maxpos']} mã: giữ {len(short['pf']['positions'])}, "
+          f"mua phiên tới {len(short['pf']['pend_buy'])}, bán phiên tới {len(short['pf']['pend_sell'])}; từ {short['pf']['summary']['start']}: "
+          f"{short['pf']['summary']['ret']}% vs VN-Index {short['pf']['summary']['vni_ret']}%", flush=True)
     print(f"Xong {len(rows)} mã ({len(liq_rows)} đủ thanh khoản), bỏ qua {len(skipped)}; "
           f"mua mới {len(buys)}, bán {len(sells)}; nguồn {srcs}; {time.time() - t_start:.0f}s")
 

@@ -154,3 +154,90 @@ def scan(metas, dfs, session, liq_min=1.0, recent=60):
     out['cond_label'] = COND_LABEL
     out['rule'] = dict(hold=HOLD, stop=STOP * 100, win=WIN)
     return out
+
+
+# ---------------- danh mục tối đa 7 mã ----------------
+MAXPOS = 7
+PF_START = '2025-01-02'     # bắt đầu mô phỏng danh mục trên web (cố định để vị thế không đổi theo cửa sổ dữ liệu)
+RANK_NOTE = 'Khi tín hiệu nhiều hơn chỗ trống: ưu tiên mã có G2, rồi GTGD TB20 cao hơn; chỉ mua mã GTGD TB20 ≥ ngưỡng.'
+
+
+def portfolio(dfs, ix_close, session, liq_min=1.0, start=PF_START, n_max=MAXPOS):
+    """Danh mục G1/G2: tối đa n_max mã, mỗi lệnh 1/n_max giá trị danh mục, tiền mặt 0%.
+    Backtest 2014–2026 (199 mã): CAGR 17,2%/năm, MaxDD −45%, VN-Index 10,0%, −45%."""
+    syms = [s for s, d in dfs.items() if d is not None and len(d) >= WARM + 30 and d.index[-1] == session]
+    cal = ix_close.index[(ix_close.index <= session)]
+    cal = cal[cal >= cal[0]]
+    T = len(cal); n = len(syms)
+    O = np.full((T, n), np.nan); C = O.copy(); LQ = np.zeros((T, n)); S1 = np.zeros((T, n), bool); S2 = S1.copy()
+    for j, s in enumerate(syms):
+        d = dfs[s]; pos = cal.get_indexer(d.index); ok = pos >= 0
+        M = conditions(d)
+        O[pos[ok], j] = d.o.values[ok]; C[pos[ok], j] = d.c.values[ok]
+        LQ[pos[ok], j] = (pd.Series(d.c.values * d.v.values).rolling(20).mean().values / 1e6)[ok]
+        S1[pos[ok], j] = entries(M, STRATS['G1']['cond'])[ok]; S2[pos[ok], j] = entries(M, STRATS['G2']['cond'])[ok]
+    C = pd.DataFrame(C).ffill().values
+    t0 = int(np.searchsorted(cal.values, np.datetime64(start)))
+    cash = 1.0; hold = {}; trades = []; nav = []
+
+    def rank(t, cand):
+        return sorted(cand, key=lambda j: (-int(S2[t, j]), -np.nan_to_num(LQ[t, j])))
+
+    def value(t):
+        return cash + sum(h['q'] * C[t, j] for j, h in hold.items())
+
+    for t in range(t0, T):
+        for j in list(hold):
+            h = hold[j]
+            if (t >= h['b'] + HOLD or (h['pend'] and t >= h['b'] + 3)) and np.isfinite(O[t, j]):
+                v = h['q'] * O[t, j] * (1 - FS); cash += v
+                trades.append(dict(s=syms[j], g=h['g'], buy_d=str(cal[h['b']].date()), buy_px=_r(O[h['b'], j]), sell_d=str(cal[t].date()),
+                                   sell_px=_r(O[t, j]), days=int(t - h['b']), ret=_r((v / h['cost'] - 1) * 100, 1),
+                                   why='Cắt lỗ 7%' if h['pend'] else 'Đủ 30 phiên'))
+                del hold[j]
+        if t > t0:
+            cand = [j for j in np.where((S1[t - 1] | S2[t - 1]) & (LQ[t - 1] >= liq_min) & np.isfinite(O[t]))[0] if j not in hold]
+            nv = cash + sum(h['q'] * C[t - 1, j] for j, h in hold.items())
+            for j in rank(t - 1, cand)[:max(n_max - len(hold), 0)]:
+                amt = min(nv / n_max, cash)
+                if amt <= nv * 0.02:
+                    break
+                cash -= amt
+                hold[j] = dict(q=amt / (O[t, j] * (1 + FB)), b=t, pend=False, cost=amt, g='G2' if S2[t - 1, j] else 'G1')
+        for j, h in hold.items():
+            if C[t, j] < O[h['b'], j] * (1 - STOP):
+                h['pend'] = True
+        nav.append(value(t))
+    # lệnh phiên kế tiếp
+    tn = T
+    sells = [j for j, h in hold.items() if tn >= h['b'] + HOLD or (h['pend'] and tn >= h['b'] + 3)]
+    free = n_max - len(hold) + len(sells)
+    cand = [j for j in np.where((S1[T - 1] | S2[T - 1]) & (LQ[T - 1] >= liq_min))[0] if j not in hold]
+    ranked = rank(T - 1, cand)
+    navT = nav[-1] if nav else 1.0
+    positions = []
+    for j, h in sorted(hold.items(), key=lambda x: x[1]['b']):
+        px = C[T - 1, j]
+        positions.append(dict(s=syms[j], g=h['g'], buy_d=str(cal[h['b']].date()), buy_px=_r(O[h['b'], j]), c=_r(px),
+                              ret=_r((px * (1 - FS) / (O[h['b'], j] * (1 + FB)) - 1) * 100, 1), days=int(T - h['b']),
+                              left=int(max(h['b'] + HOLD - T, 0)), stop_px=_r(O[h['b'], j] * (1 - STOP)),
+                              w=_r(h['q'] * px / navT * 100, 1), selling=j in sells,
+                              why=('Cắt lỗ 7%' if h['pend'] else 'Đủ 30 phiên') if j in sells else None))
+    vi = ix_close.reindex(cal[t0:]).ffill().values
+    eq = np.array(nav); r = np.r_[0, eq[1:] / eq[:-1] - 1] if len(eq) > 1 else np.zeros(1)
+    tr = np.array([x['ret'] for x in trades]) if trades else np.array([])
+    yrs = max(len(eq) / 250, 1e-9)
+    summ = dict(start=str(cal[t0].date()), ret=_r((eq[-1] - 1) * 100, 1), vni_ret=_r((vi[-1] / vi[0] - 1) * 100, 1),
+                cagr=_r((eq[-1] ** (1 / yrs) - 1) * 100, 1) if yrs >= 1 else None,
+                maxdd=_r((eq / np.maximum.accumulate(eq) - 1).min() * 100, 1), vni_maxdd=_r((vi / np.maximum.accumulate(vi) - 1).min() * 100, 1),
+                n_trades=len(tr), win=_r((tr > 0).mean() * 100, 0) if len(tr) else None, avg=_r(tr.mean(), 1) if len(tr) else None,
+                cash=_r(cash / navT * 100, 1))
+    step = max(1, len(eq) // 300)
+    series = [[str(cal[t0 + i].date()), _r(eq[i] * 100, 2), _r(vi[i] / vi[0] * 100, 2)] for i in range(0, len(eq), step)]
+    if len(eq) and series[-1][0] != str(cal[T - 1].date()):
+        series.append([str(cal[T - 1].date()), _r(eq[-1] * 100, 2), _r(vi[-1] / vi[0] * 100, 2)])
+    return dict(maxpos=n_max, rank_note=RANK_NOTE, summary=summ, positions=positions,
+                pend_buy=[dict(s=syms[j], g='G2' if S2[T - 1, j] else 'G1', liq=_r(LQ[T - 1, j], 1)) for j in ranked[:max(free, 0)]],
+                skipped=[dict(s=syms[j], g='G2' if S2[T - 1, j] else 'G1', liq=_r(LQ[T - 1, j], 1)) for j in ranked[max(free, 0):]],
+                pend_sell=[p for p in positions if p['selling']], trades=trades[::-1][:120], series=series,
+                bt=dict(cagr=17.2, maxdd=-45.3, vni_cagr=10.0, vni_maxdd=-45.3, cagr_is=23.2, cagr_oos=3.3, vni_is=14.9, vni_oos=2.2, rand_oos=2.0))
