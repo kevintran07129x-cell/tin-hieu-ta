@@ -1,6 +1,6 @@
 {
  "source": "https://docs.google.com/spreadsheets/d/15CcesXSEqsFc51L0cnwTcp_YOXWwtI_b_YhjxB7_i8w (tab Trang tính1)",
- "updated": "2026-11-25",
+ "updated": "2026-11-25 (quét lại sheet 11:22)",
  "note": "Danh sách mã anh Kevin theo dõi, đúng các mã trong sheet; web chỉ chấm và báo tín hiệu các mã này. Mã nằm ở nhiều nhóm lấy nhóm đầu tiên làm ngành. Bỏ BDB và HAI vì đã hủy niêm yết, không có dữ liệu giá.",
  "sectors": {
   "BĐS": [
@@ -189,14 +189,7 @@
   ],
   "Dược phẩm": [
    "DHG",
-   "IMP",
-   "FRT",
-   "DCL",
-   "DBT",
-   "AMV",
-   "JVC",
-   "DMC",
-   "TRA"
+   "IMP"
   ],
   "Đường": [
    "QNS",
