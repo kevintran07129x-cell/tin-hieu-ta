@@ -1,0 +1,27 @@
+name: Thử nến giữa phiên (tạm)
+on:
+  push:
+    branches: [claude/project-thread-3c5f94]
+    paths: ['.github/workflows/thu-giua-phien.yml']
+jobs:
+  thu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -q -r requirements.txt
+      - name: Thử ghép nến hôm nay
+        run: |
+          python - <<'PY'
+          import sys, datetime as dt; sys.path.insert(0, 'scripts')
+          import build
+          now = dt.datetime.now(build.VN)
+          for s, ix in [('VNINDEX', True), ('FPT', False), ('HPG', False)]:
+              d = build.fetch(s, ix)
+              print(s, 'nen ngay cuoi', d.index[-1].date(), d.c.iloc[-1])
+              print(s, 'ghep 15p', build.today_bar(s, ix, now))
+          build.INTRADAY = True
+          d = build.get('VNINDEX', True); print('get INTRADAY', d.tail(2))
+          PY
