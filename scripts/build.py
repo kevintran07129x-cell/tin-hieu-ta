@@ -102,7 +102,38 @@ def get(sym, is_index=False):
     if not INTRADAY and d is not None and len(d) and now.hour * 60 + now.minute < 15 * 60 + 5 \
             and d.index[-1] == pd.Timestamp(now.date()):
         src = d.attrs.get('src'); d = d.iloc[:-1]; d.attrs['src'] = src
+    # giữa phiên: nến ngày của nguồn chưa có hôm nay, ghép từ nến 15 phút
+    if INTRADAY and d is not None and len(d) and not os.environ.get('OFFLINE_DIR') \
+            and d.index[-1] < pd.Timestamp(now.date()):
+        b = today_bar(sym, is_index, now)
+        if b is not None:
+            src = d.attrs.get('src'); d = pd.concat([d, b]); d.attrs['src'] = src
     return d
+
+
+def today_bar(sym, is_index, now):
+    t0 = int(dt.datetime(now.year, now.month, now.day, tzinfo=VN).timestamp())
+    t1 = int(time.time()) + 60
+    kind = 'index' if is_index else 'stock'
+    srcs = [('https://services.entrade.com.vn/chart-api/v2/ohlcs/' + kind, '15'),
+            ('https://histdatafeed.vps.com.vn/tradingview/history', '15')]
+    for u, res in srcs:
+        try:
+            r = requests.get(u, params={'symbol': sym, 'resolution': res, 'from': t0, 'to': t1}, headers=UA, timeout=20)
+            r.raise_for_status()
+            j = r.json()
+            if not j or not j.get('t'):
+                continue
+            m = pd.DataFrame({k: j[k] for k in ('t', 'o', 'h', 'l', 'c', 'v')}).astype(float)
+            m = m[m.t >= t0].sort_values('t')
+            m = m[(m.c > 0) & (m.o > 0)]
+            if not len(m):
+                continue
+            return pd.DataFrame(dict(o=m.o.iloc[0], h=m.h.max(), l=m.l.min(), c=m.c.iloc[-1], v=m.v.sum()),
+                                index=[pd.Timestamp(now.date())])
+        except Exception:  # noqa: BLE001
+            continue
+    return None
 
 
 # ---------------- tính toán ----------------
@@ -164,6 +195,9 @@ def main():
     if ix is None or len(ix) < 260:
         sys.exit('Không tải được VN-Index, dừng.')
     session = ix.index[-1]
+    if INTRADAY and session < pd.Timestamp(dt.datetime.now(VN).date()):
+        print(f'Giữa phiên: chưa lấy được giá hôm nay (phiên cuối {session.date()}), giữ nguyên bản đã chốt.')
+        sys.exit(0)
     print('Phiên', session.date(), 'nguồn', ix.attrs.get('src'), flush=True)
 
     with ThreadPoolExecutor(max_workers=int(os.environ.get('WORKERS', '6'))) as ex:
