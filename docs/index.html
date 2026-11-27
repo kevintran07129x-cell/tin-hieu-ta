@@ -98,15 +98,20 @@ a{color:var(--acc)}
 </div>
 
 <div class="card" id="sh">
-  <h2>Bộ tín hiệu ngắn hạn G1, G2 <span class="sub">(giữ tối đa 30 phiên, cắt lỗ 7%)</span></h2>
+  <h2>Bộ tín hiệu ngắn hạn G1, G2 <span class="sub">(giữ tối đa 30 phiên, cắt lỗ 7%, danh mục tối đa 7 mã)</span></h2>
   <div id="shrule" class="sub"></div>
   <div class="tw" style="margin-top:8px"><table id="shbt"></table></div>
   <div class="grid2" style="margin-top:6px">
-    <div><h3>Mua mới <span class="sub">(mua giá mở cửa phiên kế tiếp)</span></h3><div class="tw"><table id="shbuy"></table></div></div>
-    <div><h3>Bán phiên kế tiếp <span class="sub">(giá mở cửa)</span></h3><div class="tw"><table id="shsell"></table></div></div>
+    <div><h3>Tín hiệu mua phiên này <span class="sub">(tất cả mã bật G1/G2)</span></h3><div class="tw"><table id="shbuy"></table></div></div>
+    <div><h3>Cách chọn khi đủ 7 mã</h3><div class="sub" id="shrank"></div></div>
   </div>
+  <h3>Danh mục G1/G2 <span class="sub" id="shpfsub"></span></h3>
+  <div class="kpis" id="shkpis" style="margin-top:6px"></div>
+  <div id="shchart"></div>
+  <div class="legend"><span><i class="sw" style="background:var(--acc)"></i> Danh mục G1/G2</span><span><i class="sw" style="background:var(--mut)"></i> VN-Index</span></div>
   <h3>Đang giữ</h3><div class="tw" style="max-height:420px"><table id="shpos"></table></div>
-  <h3>Lệnh đã đóng 60 phiên gần nhất</h3><div class="tw" style="max-height:360px"><table id="shcl"></table></div>
+  <h3>Lệnh phiên kế tiếp <span class="sub">(giá mở cửa)</span></h3><div id="shpend"></div>
+  <h3>Lệnh đã đóng</h3><div class="tw" style="max-height:360px"><table id="shcl"></table></div>
   <div class="sub" id="shnote" style="margin-top:10px"></div>
 </div>
 
@@ -202,7 +207,7 @@ function render() {
     ['Điểm mua mới', D.buys.length, `mã bật tổ hợp, vốn hóa ≥ ${fmt(D.cap_min ?? 300, 0)} tỷ`],
     ['Điểm bán', D.sells.length, 'mã Supertrend lật xuống'],
     ['Đang giữ theo tổ hợp', nOpen, 'Supertrend chưa lật'],
-    ...(D.short ? [['Ngắn hạn G1/G2', `${D.short.buys.length} mua · ${D.short.sells.length} bán`, `đang giữ ${D.short.holding.length} vị thế`]] : []),
+    ...(D.short && D.short.pf ? [['Danh mục G1/G2', `${D.short.pf.pend_buy.length} mua · ${D.short.pf.pend_sell.length} bán`, `đang giữ ${D.short.pf.positions.length}/${D.short.pf.maxpos} mã`]] : []),
   ].map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
   $('#regnote').textContent = m.regime_note;
   chart(m.history);
@@ -230,19 +235,43 @@ function shortCard() {
   const bt = Object.entries(S.strats).map(([k, v]) => { const b = v.bt, r = S.stats[k] || {};
     return `<tr><td>${gt(k)}</td><td class="num">${b.n.toLocaleString('vi-VN')}</td><td class="num">${fmt(b.win, 0)}%</td><td class="num">${pct(b.avg_win)} / ${pct(b.avg_loss)}</td><td class="num">${pct(b.exp)}</td><td class="num">${pct(b.exp_is)} <span class="sub">(nền ${fmt(b.base_is, 1)}%)</span></td><td class="num">${pct(b.exp_oos)} <span class="sub">(nền ${fmt(b.base_oos, 1)}%)</span></td><td class="num">${r.n ?? '–'} · ${r.win == null ? '–' : fmt(r.win, 0) + '%'} · ${pct(r.exp)}</td></tr>`; }).join('');
   $('#shbt').innerHTML = `<thead><tr><th>Bộ</th><th class="num">Số lệnh 2014–2026</th><th class="num">% lệnh lãi</th><th class="num">Lãi TB / Lỗ TB</th><th class="num">Kỳ vọng/lệnh</th><th class="num">2014–2021</th><th class="num">2022–2026</th><th class="num">Dữ liệu web từ ${S.stats.G1 ? vnd(S.stats.G1.start) : '–'}: lệnh · lãi · kỳ vọng</th></tr></thead><tbody>${bt}</tbody>`;
-  $('#shbuy').innerHTML = S.buys.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Ngành</th><th class="num">Giá</th><th class="num">+/-</th><th class="num">GTGD20</th></tr></thead><tbody>` +
+  $('#shbuy').innerHTML = S.buys.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Ngành</th><th class="num">Giá</th><th class="num">+/-</th><th class="num">GTGD20</th><th>Danh mục</th></tr></thead><tbody>` +
     S.buys.map(r => `<tr><td><b>${r.s}</b>${low(r)}</td><td>${gt(r.g)}</td><td>${r.sec || ''}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.chg)}</td><td class="num">${fmt(r.liq, 1)}</td></tr>`).join('') + '</tbody>'
     : '<tr><td class="empty">Không có tín hiệu mua mới trong phiên này.</td></tr>';
-  $('#shsell').innerHTML = S.sells.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Lý do</th><th>Ngày mua</th><th class="num">Giá mua</th><th class="num">Giá hiện tại</th><th class="num">LN (sau phí)</th></tr></thead><tbody>` +
-    S.sells.map(r => `<tr><td><b>${r.s}</b></td><td>${gt(r.g)}</td><td>${why(r.why)}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.ret)}</td></tr>`).join('') + '</tbody>'
-    : '<tr><td class="empty">Không có mã nào đến hạn bán.</td></tr>';
-  $('#shpos').innerHTML = S.holding.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Ngành</th><th>Ngày mua</th><th class="num">Giá mua</th><th class="num">Giá hiện tại</th><th class="num">LN (sau phí)</th><th class="num">Số phiên đã giữ</th><th class="num">Còn lại</th><th class="num">Giá cắt lỗ</th><th></th></tr></thead><tbody>` +
-    S.holding.map(r => `<tr><td><b>${r.s}</b>${low(r)}</td><td>${gt(r.g)}</td><td>${r.sec || ''}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.ret)}</td><td class="num">${r.days}</td><td class="num">${r.left}</td><td class="num">${fmt(r.stop_px)}</td><td>${S.sells.some(x => x.s === r.s && x.g === r.g) ? '<span class="pill g-dn">bán phiên tới</span>' : ''}</td></tr>`).join('') + '</tbody>'
-    : '<tr><td class="empty">Chưa giữ mã nào.</td></tr>';
-  $('#shcl').innerHTML = S.closed.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Mua</th><th class="num">Giá mua</th><th>Bán</th><th class="num">Giá bán</th><th class="num">Số phiên</th><th>Lý do</th><th class="num">LN (sau phí)</th></tr></thead><tbody>` +
-    S.closed.map(r => `<tr><td><b>${r.s}</b></td><td>${gt(r.g)}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td>${vnd(r.sell_d)}</td><td class="num">${fmt(r.sell_px)}</td><td class="num">${r.days}</td><td>${why(r.why)}</td><td class="num">${pct(r.ret)}</td></tr>`).join('') + '</tbody>'
-    : '<tr><td class="empty">Chưa có lệnh nào đóng trong 60 phiên gần nhất.</td></tr>';
-  $('#shnote').innerHTML = 'Giá nghìn đồng. Vị thế tính lại mỗi phiên từ lịch sử giá theo đúng quy tắc, mỗi mã một lệnh mỗi bộ, không giới hạn số mã. Backtest 199 mã, phí mua 0,15%, bán 0,25%; nền = mua mọi phiên cùng cách giữ. Lệnh có lãi chỉ khoảng 45%, lãi đến từ ít lệnh thắng lớn; cắt lỗ 7% vẫn có lệnh lỗ 20–27% khi giảm sàn liên tiếp. Không phải khuyến nghị đầu tư.';
+  const P = S.pf;
+  if (P) {
+    const u = P.summary, bt = P.bt;
+    const inPf = new Set(P.positions.map(x => x.s)), willBuy = new Set(P.pend_buy.map(x => x.s));
+    $('#shbuy').querySelectorAll('tbody tr').forEach((tr, i) => { const r = S.buys[i]; if (!r) return;
+      tr.insertAdjacentHTML('beforeend', `<td>${willBuy.has(r.s) ? '<span class="pill g-up">mua vào danh mục</span>' : inPf.has(r.s) ? '<span class="sub">đang giữ</span>' : r.ok_liq ? '<span class="sub">hết chỗ</span>' : '<span class="sub">thanh khoản thấp</span>'}</td>`); });
+    $('#shrank').innerHTML = `${P.rank_note} Mỗi lệnh 1/${P.maxpos} giá trị danh mục, tiền chưa dùng để không lãi.<br>Đã thử 10 cách chọn (G2 trước, thanh khoản, RS 20/60 phiên, biến động thấp/cao, ngẫu nhiên): chênh lệch giữa các cách nhỏ, phần lớn nằm trong mức may rủi của chọn ngẫu nhiên. Cách này tốt nhất giai đoạn 2014–2021 (${fmt(bt.cagr_is, 1)}%/năm) và 2022–2026 vẫn ${fmt(bt.cagr_oos, 1)}%/năm, so với chọn ngẫu nhiên ${fmt(bt.rand_oos, 1)}% và VN-Index ${fmt(bt.vni_oos, 1)}%.`;
+    $('#shpfsub').textContent = `(mô phỏng giấy từ ${vnd(u.start)}, tối đa ${P.maxpos} mã)`;
+    $('#shkpis').innerHTML = [
+      ['Lợi nhuận từ ' + vnd(u.start), pct(u.ret), 'VN-Index ' + pct(u.vni_ret)],
+      ['Sụt giảm lớn nhất', fmt(u.maxdd, 1) + '%', 'VN-Index ' + fmt(u.vni_maxdd, 1) + '%'],
+      ['Đang giữ', `${P.positions.length}/${P.maxpos}`, `Tiền mặt ${fmt(u.cash, 0)}%`],
+      ['Lệnh đã đóng', u.n_trades, u.n_trades ? `Thắng ${fmt(u.win, 0)}% · TB ${fmt(u.avg, 1)}%/lệnh` : ''],
+      ['Backtest 2014–2026', fmt(bt.cagr, 1) + '%/năm', `MaxDD ${fmt(bt.maxdd, 0)}% · VN-Index ${fmt(bt.vni_cagr, 1)}%/năm`],
+    ].map(([l, v, n]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="n">${n}</div></div>`).join('');
+    const sr = P.series;
+    if (sr.length > 1) {
+      const W = 900, H = 200, Pd = 6, all = sr.flatMap(x => [x[1], x[2]]), lo = Math.min(...all), hi = Math.max(...all);
+      const X = i => Pd + i * (W - 2 * Pd) / (sr.length - 1), Y = v => H - 20 - (v - lo) / (hi - lo || 1) * (H - 36);
+      const line = (j, c, w) => `<path d="${sr.map((x, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(x[j]).toFixed(1)}`).join('')}" fill="none" stroke="${c}" stroke-width="${w}"/>`;
+      $('#shchart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Danh mục G1/G2 so với VN-Index">${line(2, 'var(--mut)', 1.5)}${line(1, 'var(--acc)', 2)}<text x="${Pd}" y="${H - 4}" font-size="11" fill="var(--mut)">${vnd(sr[0][0])}</text><text x="${W - Pd}" y="${H - 4}" font-size="11" fill="var(--mut)" text-anchor="end">${vnd(sr[sr.length - 1][0])}</text></svg>`;
+    }
+    $('#shpos').innerHTML = P.positions.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Ngày mua</th><th class="num">Giá mua</th><th class="num">Giá hiện tại</th><th class="num">LN (sau phí)</th><th class="num">Tỷ trọng</th><th class="num">Số phiên đã giữ</th><th class="num">Còn lại</th><th class="num">Giá cắt lỗ</th><th></th></tr></thead><tbody>` +
+      P.positions.map(r => `<tr><td><b>${r.s}</b></td><td>${gt(r.g)}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td class="num">${fmt(r.c)}</td><td class="num">${pct(r.ret)}</td><td class="num">${fmt(r.w, 1)}%</td><td class="num">${r.days}</td><td class="num">${r.left}</td><td class="num">${fmt(r.stop_px)}</td><td>${r.selling ? why(r.why) : ''}</td></tr>`).join('') + '</tbody>'
+      : '<tr><td class="empty">Danh mục chưa giữ mã nào.</td></tr>';
+    const pend = [...P.pend_sell.map(o => `<span class="pill g-dn">Bán ${o.s}</span> <span class="sub">${o.why} · LN hiện tại ${o.ret > 0 ? '+' : ''}${fmt(o.ret, 1)}%</span>`),
+      ...P.pend_buy.map(o => `<span class="pill g-up">Mua ${o.s}</span> <span class="sub">${o.g} · GTGD20 ${fmt(o.liq, 1)} tỷ · ~1/${P.maxpos} danh mục</span>`)];
+    if (P.skipped.length) pend.push(`<span class="sub">Có tín hiệu nhưng hết chỗ: ${P.skipped.map(x => `${x.s} (${x.g})`).join(', ')}</span>`);
+    $('#shpend').innerHTML = pend.length ? pend.map(x => `<div style="margin:3px 0">${x}</div>`).join('') : '<div class="empty">Không có lệnh cho phiên kế tiếp.</div>';
+    $('#shcl').innerHTML = P.trades.length ? `<thead><tr><th>Mã</th><th>Bộ</th><th>Mua</th><th class="num">Giá mua</th><th>Bán</th><th class="num">Giá bán</th><th class="num">Số phiên</th><th>Lý do</th><th class="num">LN (sau phí)</th></tr></thead><tbody>` +
+      P.trades.map(r => `<tr><td><b>${r.s}</b></td><td>${gt(r.g)}</td><td>${vnd(r.buy_d)}</td><td class="num">${fmt(r.buy_px)}</td><td>${vnd(r.sell_d)}</td><td class="num">${fmt(r.sell_px)}</td><td class="num">${r.days}</td><td>${why(r.why)}</td><td class="num">${pct(r.ret)}</td></tr>`).join('') + '</tbody>'
+      : '<tr><td class="empty">Chưa có lệnh nào đóng.</td></tr>';
+  }
+  $('#shnote').innerHTML = 'Giá nghìn đồng. Danh mục tính lại mỗi phiên từ lịch sử giá theo đúng quy tắc, tối đa 7 mã, mỗi mã một lệnh. Backtest 199 mã, phí mua 0,15%, bán 0,25%; nền = mua mọi phiên cùng cách giữ. Lệnh có lãi chỉ khoảng 45%, lãi đến từ ít lệnh thắng lớn; cắt lỗ 7% vẫn có lệnh lỗ 20–27% khi giảm sàn liên tiếp. Không phải khuyến nghị đầu tư.';
 }
 
 function evTable(sel, list, empty) {
